@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pebble — Handcrafted Books, Journals &amp; Papercraft</title>
+  <meta name="description" content="Local handcrafted books, journals, sketchbooks, and planners with custom designs and archival paper.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top Announcement Bar -->
+  <div class="announcement-bar">
+    <span class="badge" id="announcementBadge">Local Craft</span>
+    <span id="announcementText">Handmade in small batches • Free local doorstep delivery on orders above ₹799 • Order directly via WhatsApp</span>
+  </div>
+
+  <!-- Main Navigation -->
+  <header class="navbar">
+    <div class="container nav-container">
+      <!-- Brand Logo & Name -->
+      <a href="#home" class="brand-logo-link" title="Pebble - Home">
+        <img src="assets/pebble-logo.svg" alt="Pebble Books Logo" class="brand-logo-img" id="navBrandLogo">
+        <div class="brand-text-block">
+          <span class="brand-title" id="navBrandTitle">Pebble</span>
+          <span class="brand-subtitle" id="navBrandSubtitle">Books &amp; Papercraft</span>
+        </div>
+      </a>
+
+      <!-- Live Search Bar -->
+      <div class="nav-search-wrap">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="searchInput" class="nav-search-input" placeholder="Search by book title, design name, or pages...">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="nav-actions">
+        <!-- Direct WhatsApp Chat -->
+        <a href="https://wa.me/919876543210" target="_blank" rel="noopener" class="nav-contact-pill" id="navWhatsAppPill" title="Chat on WhatsApp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.981.536 1.761.814 2.796.814 3.178 0 5.766-2.587 5.767-5.766.002-3.18-2.585-5.766-5.767-5.766zm3.385 8.163c-.14.394-.712.729-1.002.776-.28.046-.642.067-1.036-.059-.283-.09-.643-.223-1.121-.43-1.921-.83-3.171-2.779-3.267-2.909-.095-.129-.785-1.042-.785-1.987 0-.946.496-1.411.672-1.605.176-.194.385-.243.513-.243.129 0 .257.002.37.008.12.006.279-.046.438.334.16.381.546 1.332.594 1.43.048.098.08.212.016.34-.064.129-.096.21-.192.323-.096.113-.203.253-.29.34-.097.097-.198.203-.086.395.113.193.501.826 1.074 1.337.738.657 1.36.861 1.554.957.193.097.306.081.419-.048.113-.129.483-.563.611-.756.129-.193.258-.161.435-.096.177.064 1.124.53 1.317.627.193.097.322.145.37.225.048.08.048.467-.092.861z"/>
+          </svg>
+          <span id="navWhatsAppLabel">Chat on WhatsApp</span>
+        </a>
+
+        <!-- Cart Trigger Button -->
+        <button id="cartBtn" class="cart-btn-trigger" aria-label="View Shopping Cart">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+          <span id="cartCountBadge" class="cart-counter-badge">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero" id="home">
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <div class="hero-tag" id="heroTag">Handmade Local Stationery</div>
+        <h1 class="hero-title">
+          <span id="heroTitlePrefix">Books sculpted for your thoughts, </span><span id="heroTitleHighlight">crafted like pebbles.</span>
+        </h1>
+        <p class="hero-description" id="heroDescription">
+          Discover artisanal hardbound journals, sketchbooks, and planners with custom cover designs, fountain-pen friendly pages, and lay-flat binding. Made locally with love.
+        </p>
+        <div class="hero-cta-group">
+          <a href="#catalog" class="btn-primary" id="heroPrimaryBtn">
+            Explore Collection
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </a>
+          <a href="#contact" class="btn-secondary" id="heroSecondaryBtn">
+            Visit Our Studio / Contact
+          </a>
+        </div>
+      </div>
+
+      <div class="hero-showcase">
+        <!-- Floating organic black pebble shapes -->
+        <div class="floating-pebble pebble-shape-1" aria-hidden="true">
+          <svg viewBox="0 0 140 120" fill="currentColor">
+            <path d="M22 62C14 34 42 12 78 14C114 16 134 36 128 72C122 106 88 116 52 112C24 108 26 84 22 62Z"/>
+          </svg>
+        </div>
+        <div class="floating-pebble pebble-shape-2" aria-hidden="true">
+          <svg viewBox="0 0 110 95" fill="currentColor">
+            <path d="M15 48C10 24 35 10 64 12C92 14 108 30 102 58C96 86 70 94 42 91C18 88 18 67 15 48Z"/>
+          </svg>
+        </div>
+        <div class="floating-pebble pebble-shape-3" aria-hidden="true">
+          <svg viewBox="0 0 80 70" fill="currentColor">
+            <path d="M12 36C8 18 26 8 48 9C68 10 80 22 76 43C72 64 52 70 32 68C14 66 14 50 12 36Z"/>
+          </svg>
+        </div>
+
+        <!-- Custom Hero Image Upload Display (CMS) -->
+        <img id="heroShowcaseImg" class="hero-showcase-custom-img" src="" alt="Pebble Hero Artwork" style="display: none;">
+
+        <div class="hero-book-stack" id="heroDefaultMockup">
+          <!-- Stylized Book Mockup Artwork -->
+          <svg viewBox="0 0 320 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="160" cy="360" rx="140" ry="14" fill="#000" opacity="0.12"/>
+            <rect x="25" y="100" width="230" height="250" rx="10" fill="#2F4838" transform="rotate(-6 25 100)"/>
+            <rect x="50" y="70" width="230" height="250" rx="10" fill="#1B2A47" transform="rotate(4 50 70)"/>
+            <rect x="45" y="40" width="230" height="260" rx="10" fill="#C86446"/>
+            <rect x="45" y="40" width="26" height="260" rx="4" fill="#000" opacity="0.25"/>
+            <rect x="85" y="125" width="150" height="90" rx="6" fill="#FDFBF7" opacity="0.95"/>
+            <rect x="90" y="130" width="140" height="80" rx="4" fill="none" stroke="#C86446" stroke-width="1" stroke-dasharray="3 2"/>
+            <text x="160" y="156" font-family="'Playfair Display', serif" font-size="13" font-weight="700" fill="#232220" text-anchor="middle" id="heroArtworkBrand">PEBBLE</text>
+            <text x="160" y="176" font-family="'Playfair Display', serif" font-size="15" font-weight="700" fill="#C86446" text-anchor="middle">Terracotta Botanica</text>
+            <text x="160" y="196" font-family="'Inter', sans-serif" font-size="10" font-weight="600" fill="#7E766B" text-anchor="middle" letter-spacing="1">192 PAGES • IVORY 120 GSM</text>
+            <path d="M220 40 L220 75 L227 68 L234 75 L234 40 Z" fill="#D99B26"/>
+          </svg>
+
+          <!-- Floating Badge -->
+          <div class="hero-badge-float">
+            <div class="badge-icon">📖</div>
+            <div>
+              <div class="badge-title">100% Archival Paper</div>
+              <div class="badge-sub">120+ GSM Bleed-Proof Pages</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trust / Value Proposition Bar -->
+  <section class="trust-bar">
+    <div class="container trust-grid" id="trustGridContainer">
+      <!-- Injected dynamically based on site config -->
+    </div>
+  </section>
+
+  <!-- Main Product Catalog Section -->
+  <main class="catalog-section" id="catalog">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-tag" id="catalogTag">Curated Collection</span>
+        <h2 class="section-title" id="catalogTitle">Explore Our Handcrafted Books</h2>
+        <p class="section-subtitle" id="catalogSubtitle">
+          Browse through distinct cover designs, custom page counts, and binding techniques engineered for journaling, planning, and sketching.
+        </p>
+      </div>
+
+      <!-- Catalog Controls: Category Filter Tabs, Search Counter, and Sorting -->
+      <div class="catalog-controls">
+        <div class="category-tabs-row" id="categoryTabs">
+          <button class="cat-tab active" data-category="all">All Books</button>
+          <button class="cat-tab" data-category="journals">Hardcover Journals</button>
+          <button class="cat-tab" data-category="sketchbooks">Sketchbooks</button>
+          <button class="cat-tab" data-category="planners">Planners &amp; Organizers</button>
+          <button class="cat-tab" data-category="spiral">Spiral Notebooks</button>
+          <button class="cat-tab" data-category="pocket">Pocket Books</button>
+        </div>
+
+        <div class="filter-bar-sub">
+          <div class="results-count" id="resultsCount">
+            Showing <strong>0</strong> books
+          </div>
+
+          <div class="sort-wrap">
+            <label for="sortSelect" class="sort-label">Sort by:</label>
+            <select id="sortSelect" class="sort-select">
+              <option value="featured">Featured Picks</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="pages-desc">Number of Pages (Highest)</option>
+              <option value="rating-desc">Highest Rated</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dynamic Products Grid -->
+      <div class="product-grid" id="productsGrid">
+        <!-- Injected dynamically by app.js -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Quick View Modal -->
+  <div class="modal-backdrop" id="quickViewModal" aria-hidden="true">
+    <div class="modal-card">
+      <button class="modal-close-btn" id="closeQuickViewBtn" aria-label="Close modal">&times;</button>
+      <div class="quick-view-grid" id="quickViewContent">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Cart Slide-Out Drawer -->
+  <div class="cart-drawer-backdrop" id="cartBackdrop" aria-hidden="true">
+    <div class="cart-drawer">
+      <div class="cart-header">
+        <div class="cart-title-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+          <h3>Your Bag</h3>
+        </div>
+        <button class="modal-close-btn" id="closeCartBtn" aria-label="Close bag">&times;</button>
+      </div>
+
+      <div class="cart-free-shipping-notice" id="shippingNotice">
+        Add more for free delivery!
+      </div>
+
+      <!-- Cart Items List Container -->
+      <div class="cart-items-list" id="cartItemsList">
+        <!-- Injected dynamically -->
+      </div>
+
+      <!-- Cart Drawer Footer -->
+      <div class="cart-footer" id="cartFooter">
+        <div class="cart-total-row">
+          <span class="cart-total-label">Subtotal</span>
+          <span class="cart-total-value" id="cartSubtotal">₹0</span>
+        </div>
+
+        <!-- 1-Click WhatsApp Order -->
+        <button id="whatsappCheckoutBtn" class="btn-whatsapp-checkout">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.981.536 1.761.814 2.796.814 3.178 0 5.766-2.587 5.767-5.766.002-3.18-2.585-5.766-5.767-5.766zm3.385 8.163c-.14.394-.712.729-1.002.776-.28.046-.642.067-1.036-.059-.283-.09-.643-.223-1.121-.43-1.921-.83-3.171-2.779-3.267-2.909-.095-.129-.785-1.042-.785-1.987 0-.946.496-1.411.672-1.605.176-.194.385-.243.513-.243.129 0 .257.002.37.008.12.006.279-.046.438.334.16.381.546 1.332.594 1.43.048.098.08.212.016.34-.064.129-.096.21-.192.323-.096.113-.203.253-.29.34-.097.097-.198.203-.086.395.113.193.501.826 1.074 1.337.738.657 1.36.861 1.554.957.193.097.306.081.419-.048.113-.129.483-.563.611-.756.129-.193.258-.161.435-.096.177.064 1.124.53 1.317.627.193.097.322.145.37.225.048.08.048.467-.092.861z"/>
+          </svg>
+          Order Directly on WhatsApp
+        </button>
+
+        <button id="directCheckoutBtn" class="btn-regular-checkout">
+          Proceed to Delivery Checkout
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delivery / Checkout Modal -->
+  <div class="modal-backdrop" id="checkoutModal" aria-hidden="true">
+    <div class="modal-card checkout-modal-card">
+      <button class="modal-close-btn" id="closeCheckoutBtn" aria-label="Close checkout">&times;</button>
+      <h2>Complete Your Order</h2>
+      <p class="checkout-subtitle">Enter your delivery details to receive your Pebble books.</p>
+
+      <div class="order-items-mini-summary" id="checkoutMiniSummary">
+        <!-- Mini items recap -->
+      </div>
+
+      <form id="checkoutForm" class="checkout-form">
+        <div class="form-group">
+          <label for="custName">Your Full Name *</label>
+          <input type="text" id="custName" class="form-input" placeholder="e.g. Uday Sharma" required>
+        </div>
+
+        <div class="form-group">
+          <label for="custPhone">Phone Number (WhatsApp preferred) *</label>
+          <input type="tel" id="custPhone" class="form-input" placeholder="e.g. 9876543210" required>
+        </div>
+
+        <div class="form-group">
+          <label for="custAddress">Local Delivery Address *</label>
+          <textarea id="custAddress" class="form-textarea" rows="2" placeholder="House/Flat No, Street, Landmark, Pincode" required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="payMethod">Preferred Payment Method</label>
+          <select id="payMethod" class="form-select">
+            <option value="Cash on Delivery (COD)">Cash on Delivery (Local pickup/dispatch)</option>
+            <option value="UPI / QR (Google Pay, PhonePe, Paytm)">UPI / QR Scan</option>
+            <option value="Card Payment on Delivery">Card on Delivery</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="orderNotes">Customization or Gift Note (Optional)</label>
+          <input type="text" id="orderNotes" class="form-input" placeholder="e.g. Add name inscription or gift wrapping">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button type="button" id="submitViaWhatsAppBtn" class="btn-whatsapp-checkout" style="margin-bottom:0; flex:1;">
+            Send Order via WhatsApp
+          </button>
+          <button type="submit" class="btn-primary" style="flex:1;">
+            Place Order Now
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Order Success Confirmation Modal -->
+  <div class="modal-backdrop" id="successModal" aria-hidden="true">
+    <div class="modal-card" style="max-width: 500px; padding: 36px; text-align: center;">
+      <div style="width: 64px; height: 64px; background: #E7F9EE; color: #1EBE5D; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 2rem;">
+        ✓
+      </div>
+      <h2 style="font-family: var(--font-serif); font-size: 1.8rem; margin-bottom: 8px;">Order Placed with Pebble!</h2>
+      <p style="color: var(--color-text-muted); font-size: 0.92rem; margin-bottom: 20px;" id="orderSuccessMsg">
+        Thank you for supporting our local book craft! We have received your order details.
+      </p>
+      <div id="orderReceiptDetails" style="background: var(--color-bg-body); border: 1px solid var(--color-border); border-radius: 8px; padding: 14px; text-align: left; font-size: 0.88rem; margin-bottom: 20px;">
+        <!-- Injected -->
+      </div>
+      <button class="btn-primary" id="closeSuccessBtn" style="width: 100%;">
+        Continue Browsing
+      </button>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ==========================================================================
+       FOOTER (Gmail, Instagram, WhatsApp & Admin Panel Link)
+       ========================================================================== -->
+  <footer class="site-footer" id="contact">
+    <div class="container">
+      <div class="footer-grid">
+        <!-- Brand Summary -->
+        <div class="footer-brand-col">
+          <div class="footer-brand-header">
+            <img src="assets/pebble-logo.svg" alt="Pebble Logo" id="footerBrandLogo" class="footer-brand-logo-img">
+            <div class="brand-text-block">
+              <span class="brand-title footer-brand-title" id="footerBrandTitle">Pebble</span>
+              <span class="brand-subtitle footer-brand-subtitle" id="footerBrandSubtitle">Books &amp; Papercraft</span>
+            </div>
+          </div>
+          <p class="footer-brand-desc" id="footerBrandDesc">
+            A boutique local studio crafting bespoke books, journals, and papercraft goods. Built for thinkers, dreamers, artists, and creators who treasure physical pages.
+          </p>
+          <div style="font-size: 0.85rem; color: #ADA496; line-height: 1.5;">
+            📍 <strong>Local Studio:</strong> <span id="footerStudioAddress">42 Artisan Way, Pebble Craft Lane</span><br>
+            🕒 <strong>Hours:</strong> <span id="footerStudioHours">Mon – Sat: 10:00 AM – 8:00 PM</span>
+          </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="footer-nav-col">
+          <h4 class="footer-col-title">Collections</h4>
+          <ul class="footer-links-list">
+            <li><a href="#catalog" onclick="filterCategory('journals')">Hardcover Journals</a></li>
+            <li><a href="#catalog" onclick="filterCategory('sketchbooks')">Mixed Media Sketchbooks</a></li>
+            <li><a href="#catalog" onclick="filterCategory('planners')">Productivity Planners</a></li>
+            <li><a href="#catalog" onclick="filterCategory('spiral')">Spiral Notebooks</a></li>
+            <li><a href="#catalog" onclick="filterCategory('pocket')">Pocket Thoughtbooks</a></li>
+          </ul>
+        </div>
+
+        <!-- Contact Channels: Gmail, Instagram, WhatsApp -->
+        <div class="footer-contact-col">
+          <h4 class="footer-col-title">Direct Connect</h4>
+          <div class="footer-contact-channels">
+            
+            <!-- Gmail -->
+            <a href="mailto:pebbleee17@gmail.com" id="footerGmailCard" class="contact-card-link" title="Send email to Pebble">
+              <div class="contact-icon-box gmail-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                </svg>
+              </div>
+              <div class="contact-card-info">
+                <h5>Email Us (Gmail)</h5>
+                <p id="footerGmailLabel">pebbleee17@gmail.com</p>
+              </div>
+            </a>
+
+            <!-- Instagram -->
+            <a href="https://instagram.com/pebble.books" id="footerInstaCard" target="_blank" rel="noopener noreferrer" class="contact-card-link" title="Follow Pebble on Instagram">
+              <div class="contact-icon-box insta-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                </svg>
+              </div>
+              <div class="contact-card-info">
+                <h5>Instagram</h5>
+                <p id="footerInstaLabel">@pebble.books</p>
+              </div>
+            </a>
+
+            <!-- WhatsApp -->
+            <a href="https://wa.me/919876543210" id="footerWhatsAppCard" target="_blank" rel="noopener noreferrer" class="contact-card-link" title="Chat on WhatsApp with Pebble">
+              <div class="contact-icon-box wa-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.981.536 1.761.814 2.796.814 3.178 0 5.766-2.587 5.767-5.766.002-3.18-2.585-5.766-5.767-5.766zm3.385 8.163c-.14.394-.712.729-1.002.776-.28.046-.642.067-1.036-.059-.283-.09-.643-.223-1.121-.43-1.921-.83-3.171-2.779-3.267-2.909-.095-.129-.785-1.042-.785-1.987 0-.946.496-1.411.672-1.605.176-.194.385-.243.513-.243.129 0 .257.002.37.008.12.006.279-.046.438.334.16.381.546 1.332.594 1.43.048.098.08.212.016.34-.064.129-.096.21-.192.323-.096.113-.203.253-.29.34-.097.097-.198.203-.086.395.113.193.501.826 1.074 1.337.738.657 1.36.861 1.554.957.193.097.306.081.419-.048.113-.129.483-.563.611-.756.129-.193.258-.161.435-.096.177.064 1.124.53 1.317.627.193.097.322.145.37.225.048.08.048.467-.092.861z"/>
+                </svg>
+              </div>
+              <div class="contact-card-info">
+                <h5>WhatsApp Orders</h5>
+                <p id="footerWhatsAppLabel">+91 98765 43210</p>
+              </div>
+            </a>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Bottom Copyright -->
+      <div class="footer-bottom">
+        <div id="footerCopyright">© 2026 Pebble Books &amp; Papercraft. Handcrafted with care for book lovers.</div>
+        <div style="display: flex; gap: 16px;">
+          <span>Zero Plastic Packaging</span>
+          <span>•</span>
+          <span>100% Recycled Cotton Fiber</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="products.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
