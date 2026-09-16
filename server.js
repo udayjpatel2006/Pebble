@@ -223,12 +223,12 @@ const server = http.createServer(async (req, res) => {
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
       // Smart Cache-Control:
-      // HTML files: check freshness (no-cache, must-revalidate)
-      // Static assets (CSS, JS, SVG, Images): cache for fast loading & repeat visits
-      const isHtml = ext === '.html';
-      const cacheControl = isHtml
-        ? 'no-cache, must-revalidate'
-        : 'public, max-age=86400, stale-while-revalidate=604800';
+      // HTML and Scripts (JS, CSS): check freshness (no-cache, must-revalidate)
+      // Images / SVGs: cache for fast loading
+      const isHtmlOrScript = ext === '.html' || ext === '.js' || ext === '.css';
+      const cacheControl = isHtmlOrScript
+        ? 'no-cache, must-revalidate, max-age=0'
+        : 'public, max-age=86400';
 
       const headers = {
         'Content-Type': contentType,

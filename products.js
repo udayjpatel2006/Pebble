@@ -369,11 +369,12 @@ if (typeof window !== 'undefined') {
 
 function getBookCoverSvg(product) {
   if (!product) return '';
-  if (product.customImageUrl && product.customImageUrl.trim()) {
-    const designLabel = escapeHtml(product.designName || product.title || 'Custom Design');
-    const pagesLabel = product.pages ? `${product.pages}p` : '';
-    return `
-      <div class="book-cover-custom-img" style="width: 100%; height: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 24px rgba(25, 23, 20, 0.2); position: relative;">
+  try {
+    if (product.customImageUrl && String(product.customImageUrl).trim()) {
+      const designLabel = escapeHtml(product.designName || product.title || 'Custom Design');
+      const pagesLabel = product.pages ? `${product.pages}p` : '';
+      return `
+        <div class="book-cover-custom-img" style="width: 100%; height: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 24px rgba(25, 23, 20, 0.2); position: relative;">
         <img src="${product.customImageUrl}" alt="${designLabel}" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.onerror=null; this.style.display='none';" />
         <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(255,255,255,0.92); padding: 4px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-align: center; color: #232220;">
           ${designLabel} ${pagesLabel ? '• ' + pagesLabel : ''}
@@ -483,7 +484,7 @@ function getBookCoverSvg(product) {
     `;
   }
 
-  const dim = product.dimensions ? product.dimensions.split(' ')[0] : 'A5';
+  const dim = product.dimensions ? String(product.dimensions).split(' ')[0] : 'A5';
 
   return `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 340" class="book-cover-vector">
@@ -514,11 +515,19 @@ function getBookCoverSvg(product) {
       
       <!-- Typography on Label -->
       <text x="130" y="142" font-family="'Playfair Display', Georgia, serif" font-size="11" font-weight="700" fill="#232220" text-anchor="middle" letter-spacing="0.5">PEBBLE</text>
-      <text x="130" y="160" font-family="'Playfair Display', Georgia, serif" font-size="13" font-weight="700" fill="${color}" text-anchor="middle">${product.designName}</text>
-      <text x="130" y="180" font-family="'Inter', sans-serif" font-size="9.5" font-weight="600" fill="#696256" text-anchor="middle" letter-spacing="1">${product.pages} PAGES • ${dim}</text>
+      <text x="130" y="160" font-family="'Playfair Display', Georgia, serif" font-size="13" font-weight="700" fill="${color}" text-anchor="middle">${product.designName || ''}</text>
+      <text x="130" y="180" font-family="'Inter', sans-serif" font-size="9.5" font-weight="600" fill="#696256" text-anchor="middle" letter-spacing="1">${product.pages || ''} PAGES • ${dim}</text>
       
       <!-- Ribbon Bookmark subtle peak -->
       <path d="M195 10 L195 45 L202 38 L209 45 L209 10 Z" fill="#D99B26" opacity="0.9"/>
     </svg>
   `;
+  } catch (err) {
+    console.warn('[Pebble] Fallback cover rendered for:', product && product.id, err);
+    return `
+      <div class="book-cover-custom-img" style="width: 100%; height: 100%; border-radius: 10px; background: #C86446; display: flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 0.9rem;">
+        ${escapeHtml(product && (product.designName || product.title) || 'Pebble Book')}
+      </div>
+    `;
+  }
 }

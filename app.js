@@ -431,89 +431,119 @@
     });
   }
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   function renderProducts() {
-    const filtered = getFilteredProducts();
+    try {
+      const filtered = getFilteredProducts();
 
-    resultsCount.innerHTML = `Showing <strong>${filtered.length}</strong> ${filtered.length === 1 ? 'book' : 'books'}`;
+      if (resultsCount) {
+        resultsCount.innerHTML = `Showing <strong>${filtered.length}</strong> ${filtered.length === 1 ? 'book' : 'books'}`;
+      }
 
-    if (filtered.length === 0) {
-      productsGrid.innerHTML = `
-        <div class="catalog-empty-state">
-          <h3>No books match your criteria</h3>
-          <p>Try searching for a different design name, title, or clearing your active filters.</p>
-          <button class="btn-secondary" onclick="resetFilters()">Reset All Filters</button>
-        </div>
-      `;
-      return;
-    }
-
-    productsGrid.innerHTML = filtered
-      .map((product) => {
-        const coverSvgHtml = getBookCoverSvg(product);
-        const origPriceHtml = product.originalPrice && product.originalPrice > product.price
-          ? `<span class="price-original">₹${product.originalPrice}</span>`
-          : '';
-
-        const dimText = product.dimensions ? product.dimensions.split(' ')[0] : 'Standard';
-        const gsmText = product.paperGsm ? product.paperGsm.split(' ')[0] : '100';
-
-        return `
-        <article class="product-card" data-id="${product.id}">
-          <div class="card-media">
-            ${product.isBestseller ? '<span class="badge-bestseller">Bestseller</span>' : ''}
-            <div class="card-media-vector">
-              ${coverSvgHtml}
+      if (filtered.length === 0) {
+        if (productsGrid) {
+          productsGrid.innerHTML = `
+            <div class="catalog-empty-state">
+              <h3>No books match your criteria</h3>
+              <p>Try searching for a different design name, title, or clearing your active filters.</p>
+              <button class="btn-secondary" onclick="resetFilters()">Reset All Filters</button>
             </div>
-            <button class="quick-view-overlay-btn" onclick="openQuickView('${product.id}')">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              Quick Specs
-            </button>
-          </div>
+          `;
+        }
+        return;
+      }
 
-          <div class="card-body">
-            <!-- Prominent Design Name & Number of Pages -->
-            <div class="design-spec-badge-row">
-              <span class="design-name-chip" title="Cover Design Name">
-                🎨 ${escapeHtml(product.designName)}
-              </span>
-              <span class="pages-count-chip" title="Total Page Count">
-                📖 ${product.pages} Pages
-              </span>
-            </div>
+      const cardsHtml = filtered
+        .map((product) => {
+          try {
+            const coverSvgHtml = (typeof getBookCoverSvg === 'function')
+              ? getBookCoverSvg(product)
+              : '';
 
-            <h3 class="card-title">${escapeHtml(product.title)}</h3>
-            <div class="card-design-subtitle">Artisan Edition • ${escapeHtml(dimText)}</div>
+            const origPriceHtml = product.originalPrice && product.originalPrice > product.price
+              ? `<span class="price-original">₹${product.originalPrice}</span>`
+              : '';
 
-            <!-- Mini specs chips -->
-            <div class="card-specs-mini">
-              <span class="spec-mini-item">${escapeHtml(product.ruling || 'Plain')}</span>
-              <span class="spec-mini-item">${escapeHtml(gsmText)} GSM</span>
-            </div>
+            const dimText = product.dimensions ? String(product.dimensions).split(' ')[0] : 'Standard';
+            const gsmText = product.paperGsm ? String(product.paperGsm).split(' ')[0] : '100';
 
-            <!-- Card Price & Add to Bag -->
-            <div class="card-footer-row">
-              <div class="price-box">
-                <div class="price-main">
-                  ₹${product.price}
-                  ${origPriceHtml}
+            return `
+            <article class="product-card" data-id="${escapeHtml(product.id)}">
+              <div class="card-media">
+                ${product.isBestseller ? '<span class="badge-bestseller">Bestseller</span>' : ''}
+                <div class="card-media-vector">
+                  ${coverSvgHtml}
                 </div>
+                <button class="quick-view-overlay-btn" onclick="openQuickView('${escapeHtml(product.id)}')">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                  Quick Specs
+                </button>
               </div>
 
-              <button class="btn-add-cart" onclick="addToCart('${product.id}')" aria-label="Add ${escapeHtml(product.title)} to bag">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                  <path d="M12 5v14M5 12h14"></path>
-                </svg>
-                Add
-              </button>
-            </div>
-          </div>
-        </article>
-      `;
-      })
-      .join('');
+              <div class="card-body">
+                <!-- Prominent Design Name & Number of Pages -->
+                <div class="design-spec-badge-row">
+                  <span class="design-name-chip" title="Cover Design Name">
+                    🎨 ${escapeHtml(product.designName || 'Artisan Design')}
+                  </span>
+                  <span class="pages-count-chip" title="Total Page Count">
+                    📖 ${product.pages || 120} Pages
+                  </span>
+                </div>
+
+                <h3 class="card-title">${escapeHtml(product.title || 'Handcrafted Book')}</h3>
+                <div class="card-design-subtitle">Artisan Edition • ${escapeHtml(dimText)}</div>
+
+                <!-- Mini specs chips -->
+                <div class="card-specs-mini">
+                  <span class="spec-mini-item">${escapeHtml(product.ruling || 'Plain')}</span>
+                  <span class="spec-mini-item">${escapeHtml(gsmText)} GSM</span>
+                </div>
+
+                <!-- Card Price & Add to Bag -->
+                <div class="card-footer-row">
+                  <div class="price-box">
+                    <div class="price-main">
+                      ₹${product.price || 0}
+                      ${origPriceHtml}
+                    </div>
+                  </div>
+
+                  <button class="btn-add-cart" onclick="addToCart('${escapeHtml(product.id)}')" aria-label="Add ${escapeHtml(product.title || '')} to bag">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M12 5v14M5 12h14"></path>
+                    </svg>
+                    Add
+                  </button>
+                </div>
+              </div>
+            </article>
+          `;
+          } catch (itemErr) {
+            console.warn('[Pebble] Error rendering product card for:', product && product.id, itemErr);
+            return '';
+          }
+        })
+        .join('');
+
+      if (productsGrid) {
+        productsGrid.innerHTML = cardsHtml;
+      }
+    } catch (renderErr) {
+      console.error('[Pebble] renderProducts fatal error:', renderErr);
+    }
   }
 
   window.resetFilters = function () {
