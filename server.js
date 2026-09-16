@@ -272,11 +272,15 @@ function escapeHtml(str) {
   })[m]);
 }
 
-server.listen(PORT, () => {
-  console.log(`[Pebble] Server listening at http://localhost:${PORT}/`);
-  console.log(`[Pebble] Admin Panel at http://localhost:${PORT}/admin.html`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`[Pebble] Server listening at http://localhost:${PORT}/`);
+    console.log(`[Pebble] Admin Panel at http://localhost:${PORT}/admin.html`);
+  });
+}
 
 server.on('error', (err) => {
   console.error('[Pebble Server Error]:', err);
 });
+
+module.exports = server;

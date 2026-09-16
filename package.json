@@ -1,14 +1,18 @@
 {
   "name": "pebble",
   "version": "1.0.0",
-  "description": "",
-  "main": "admin.js",
+  "description": "Pebble — Handcrafted Books, Journals & Papercraft",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "ecommerce",
+    "stationery",
+    "journals",
+    "books",
+    "papercraft"
+  ],
+  "author": "Pebble Studio",
   "license": "ISC",
   "dependencies": {
     "firebase": "^12.19.0",

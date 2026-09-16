@@ -130,6 +130,14 @@ Or on Windows, simply double-click **`start-pebble.bat`**.
 - **Storefront**: [http://localhost:8000/](http://localhost:8000/)
 - **Admin Panel**: [http://localhost:8000/admin.html](http://localhost:8000/admin.html)
 
+### 7. Deploying to Vercel
+1. Import this repository into **[Vercel](https://vercel.com/)**.
+2. Framework Preset: **Other** (Root Directory: `./`).
+3. Add Environment Variables in your Vercel Project Settings:
+   - `GMAIL_USER`: `pebbleee17@gmail.com`
+   - `GMAIL_APP_PASSWORD`: Your 16-digit Gmail App Password
+4. Click **Deploy**. Vercel will instantly host your storefront globally on the Edge Network with zero configuration!
+
 ---
 
 ## 🔒 Security & Admin Access
