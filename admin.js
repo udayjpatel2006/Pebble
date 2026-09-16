@@ -341,12 +341,45 @@
   }
 
   async function loadData() {
-    if (typeof getCloudSiteConfig === 'function') {
-      siteConfig = await getCloudSiteConfig();
-      productsList = await getCloudProducts();
-    } else {
-      siteConfig = getSiteConfig();
-      productsList = getProducts();
+    // 1. Instant local render first (zero latency)
+    siteConfig = getSiteConfig();
+    productsList = getProducts();
+    if (!Array.isArray(productsList) || productsList.length === 0) {
+      productsList = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS))
+        ? [...DEFAULT_PRODUCTS]
+        : [];
+      saveProducts(productsList);
+    }
+
+    // 2. Resilient cloud sync with timeout guard
+    if (typeof getCloudSiteConfig === 'function' && typeof getCloudProducts === 'function') {
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Cloud sync timeout')), 2500)
+        );
+
+        const [cloudConfig, cloudProds] = await Promise.race([
+          Promise.all([getCloudSiteConfig(), getCloudProducts()]),
+          timeoutPromise
+        ]);
+
+        let hasChange = false;
+        if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
+          siteConfig = cloudConfig;
+          saveSiteConfig(cloudConfig);
+          populateFormValues();
+          hasChange = true;
+        }
+
+        if (Array.isArray(cloudProds) && cloudProds.length > 0) {
+          productsList = cloudProds;
+          saveProducts(cloudProds);
+          renderProductsTable();
+          hasChange = true;
+        }
+      } catch (err) {
+        console.warn('[Pebble Admin] Cloud sync notice:', err.message);
+      }
     }
   }
 

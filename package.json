@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "Pebble — Handcrafted Books, Journals & Papercraft",
   "scripts": {
-    "start": "node server.js"
+    "dev": "node server.js",
+    "local": "node server.js"
   },
   "keywords": [
     "ecommerce",

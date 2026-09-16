@@ -63,16 +63,53 @@
   }
 
   async function loadData() {
-    if (typeof getCloudSiteConfig === 'function') {
-      siteConfig = await getCloudSiteConfig();
-      productsList = await getCloudProducts();
-    } else {
-      siteConfig = getSiteConfig();
-      productsList = getProducts();
+    // 1. Instant local render (Zero latency - books display immediately!)
+    siteConfig = getSiteConfig();
+    productsList = getProducts();
+    if (!Array.isArray(productsList) || productsList.length === 0) {
+      productsList = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS))
+        ? [...DEFAULT_PRODUCTS]
+        : [];
+      saveProducts(productsList);
     }
     applySiteConfig();
     renderProducts();
     updateCartUI();
+
+    // 2. Resilient background cloud sync (guarded by timeout so it never blocks or breaks)
+    if (typeof getCloudSiteConfig === 'function' && typeof getCloudProducts === 'function') {
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Cloud sync timeout')), 2500)
+        );
+
+        const [cloudConfig, cloudProds] = await Promise.race([
+          Promise.all([getCloudSiteConfig(), getCloudProducts()]),
+          timeoutPromise
+        ]);
+
+        let hasChange = false;
+        if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
+          siteConfig = cloudConfig;
+          saveSiteConfig(cloudConfig);
+          applySiteConfig();
+          hasChange = true;
+        }
+
+        if (Array.isArray(cloudProds) && cloudProds.length > 0) {
+          productsList = cloudProds;
+          saveProducts(cloudProds);
+          renderProducts();
+          hasChange = true;
+        }
+
+        if (hasChange) {
+          updateCartUI();
+        }
+      } catch (err) {
+        console.log('[Pebble] Local catalog active (Cloud sync offline or skipped):', err.message);
+      }
+    }
   }
 
   // Apply dynamic texts, logos, and links
@@ -121,7 +158,9 @@
     if (heroHighlight) heroHighlight.textContent = siteConfig.heroTitleHighlight || '';
     if (heroDesc) heroDesc.textContent = siteConfig.heroDescription || '';
     if (heroPrimaryBtn && siteConfig.heroPrimaryBtnText) {
-      heroPrimaryBtn.childNodes[0].nodeValue = siteConfig.heroPrimaryBtnText + ' ';
+      if (heroPrimaryBtn.childNodes && heroPrimaryBtn.childNodes[0] && heroPrimaryBtn.childNodes[0].nodeType === 3) {
+        heroPrimaryBtn.childNodes[0].nodeValue = siteConfig.heroPrimaryBtnText + ' ';
+      }
     }
     if (heroSecondaryBtn && siteConfig.heroSecondaryBtnText) {
       heroSecondaryBtn.textContent = siteConfig.heroSecondaryBtnText;
