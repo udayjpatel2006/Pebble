@@ -102,8 +102,8 @@ Pebble/
 
 ### 2. Clone the Repository
 ```bash
-git clone https://github.com/Mounikaa7/Pebble-.git
-cd Pebble-
+git clone https://github.com/udayjpatel2006/Pebble.git
+cd Pebble
 ```
 
 ### 3. Install Dependencies
