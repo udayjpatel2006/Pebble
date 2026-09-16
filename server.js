@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 // Auto-load .env file if present
 const envPath = path.join(__dirname, '.env');
@@ -221,25 +222,38 @@ const server = http.createServer(async (req, res) => {
       const ext = path.extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
-      // Security and cache control headers
-      res.writeHead(200, {
+      // Smart Cache-Control:
+      // HTML files: check freshness (no-cache, must-revalidate)
+      // Static assets (CSS, JS, SVG, Images): cache for fast loading & repeat visits
+      const isHtml = ext === '.html';
+      const cacheControl = isHtml
+        ? 'no-cache, must-revalidate'
+        : 'public, max-age=86400, stale-while-revalidate=604800';
+
+      const headers = {
         'Content-Type': contentType,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Cache-Control': cacheControl,
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'SAMEORIGIN',
         'X-XSS-Protection': '1; mode=block',
         'Referrer-Policy': 'strict-origin-when-cross-origin'
-      });
+      };
 
-      const readStream = fs.createReadStream(filePath);
-      readStream.on('error', (streamErr) => {
-        console.error('Stream error:', streamErr);
-        if (!res.headersSent) {
-          res.writeHead(500, { 'Content-Type': 'text/plain' });
-        }
-        res.end('Server Error');
-      });
-      readStream.pipe(res);
+      // Gzip Compression for text-based assets (HTML, CSS, JS, SVG, JSON)
+      const acceptEncoding = req.headers['accept-encoding'] || '';
+      const isCompressible = /^(text\/|application\/json|image\/svg\+xml)/.test(contentType);
+
+      if (isCompressible && acceptEncoding.includes('gzip')) {
+        headers['Content-Encoding'] = 'gzip';
+        res.writeHead(200, headers);
+        const rawStream = fs.createReadStream(filePath);
+        const gzipStream = zlib.createGzip({ level: 6 });
+        rawStream.pipe(gzipStream).pipe(res);
+      } else {
+        res.writeHead(200, headers);
+        const readStream = fs.createReadStream(filePath);
+        readStream.pipe(res);
+      }
     });
   } catch (e) {
     console.error('Request handler error:', e);

@@ -354,7 +354,7 @@ function getBookCoverSvg(product) {
   if (product.customImageUrl) {
     return `
       <div class="book-cover-custom-img" style="width: 100%; height: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 24px rgba(25, 23, 20, 0.2); position: relative;">
-        <img src="${product.customImageUrl}" alt="${product.designName}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+        <img src="${product.customImageUrl}" alt="${escapeHtml(product.designName)}" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
         <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(255,255,255,0.92); padding: 4px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-align: center; color: #232220;">
           ${product.designName} • ${product.pages}p
         </div>
