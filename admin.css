@@ -547,6 +547,24 @@ button {
   color: #C62828;
 }
 
+.table-badge-pill {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.table-badge-bestseller { background: #1F1D24; color: #FFFFFF; }
+.table-badge-new { background: #7C3AED; color: #FFFFFF; }
+.table-badge-limited { background: #C86446; color: #FFFFFF; }
+.table-badge-trending { background: #DB2777; color: #FFFFFF; }
+.table-badge-sale { background: #059669; color: #FFFFFF; }
+.table-badge-low-stock { background: #DC2626; color: #FFFFFF; }
+
 .action-btn-row {
   display: flex;
   align-items: center;

@@ -749,6 +749,7 @@ img, svg {
   box-shadow: var(--shadow-sm);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  cursor: pointer;
 }
 
 .product-card:hover {
@@ -878,19 +879,61 @@ img, svg {
   border-color: var(--color-primary);
 }
 
-.badge-bestseller {
+/* Product Badges (NEW, BESTSELLER, LIMITED, TRENDING, SALE, LOW STOCK) */
+.badge-bestseller,
+.product-badge {
   position: absolute;
   top: 12px;
   left: 12px;
-  background: #232220;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.7px;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
-  z-index: 2;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
+  line-height: 1.2;
+}
+
+.badge-bestseller,
+.product-badge.badge-bestseller {
+  background: #1F1D24;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.product-badge.badge-new {
+  background: #7C3AED;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.product-badge.badge-limited {
+  background: #C86446;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.product-badge.badge-trending {
+  background: #DB2777;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.product-badge.badge-sale {
+  background: #059669;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.product-badge.badge-low-stock {
+  background: #DC2626;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
 .quick-view-overlay-btn {
@@ -1095,6 +1138,9 @@ img, svg {
   align-items: center;
   gap: 6px;
   transition: var(--transition);
+  position: relative;
+  z-index: 5;
+  cursor: pointer;
 }
 
 .btn-add-cart:hover {
@@ -2082,6 +2128,13 @@ img, svg {
     height: 175px;
     max-width: 130px;
   }
+  .badge-bestseller,
+  .product-badge {
+    font-size: 0.62rem;
+    padding: 3px 8px;
+    top: 8px;
+    left: 8px;
+  }
   /* Show quick specs button on touch/mobile devices for instant access */
   .quick-view-overlay-btn {
     opacity: 0.95;
@@ -2231,7 +2284,8 @@ img, svg {
     width: 12px;
     height: 5px;
   }
-  .badge-bestseller {
+  .badge-bestseller,
+  .product-badge {
     font-size: 0.58rem;
     padding: 2px 6px;
     top: 6px;

@@ -107,6 +107,11 @@
               ...def,
               ...local,
               ...cp,
+              badge: (cp.badge && String(cp.badge).trim())
+                || (local.badge && String(local.badge).trim())
+                || (def.badge && String(def.badge).trim())
+                || (cp.isBestseller ? 'BESTSELLER' : '')
+                || '',
               customBackImageUrl: (cp.customBackImageUrl && cp.customBackImageUrl.trim())
                 || (local.customBackImageUrl && local.customBackImageUrl.trim())
                 || (def.customBackImageUrl && def.customBackImageUrl.trim())
@@ -438,6 +443,8 @@
     let isHorizontalSwipe = false;
     let isVerticalScroll = false;
 
+    let hasJustSwiped = false;
+
     // Mobile touch gestures
     document.addEventListener('touchstart', (e) => {
       const slider = e.target.closest('.card-image-slider');
@@ -479,6 +486,8 @@
     document.addEventListener('touchend', (e) => {
       if (!activeSlider) return;
       if (isHorizontalSwipe) {
+        hasJustSwiped = true;
+        setTimeout(() => { hasJustSwiped = false; }, 250);
         const touchEndX = e.changedTouches[0].clientX;
         const deltaX = touchEndX - touchStartX;
         if (deltaX < -24) {
@@ -522,6 +531,8 @@
     function finishMouseDrag(e) {
       if (!mouseActiveSlider) return;
       if (isMouseDragging) {
+        hasJustSwiped = true;
+        setTimeout(() => { hasJustSwiped = false; }, 250);
         const deltaX = e.clientX - mouseStartX;
         if (deltaX < -24) {
           setProductSliderIndex(mouseActiveSlider, 1);
@@ -535,6 +546,26 @@
     }
 
     document.addEventListener('mouseup', finishMouseDrag);
+
+    // Tap / click on product card opens pop-up modal
+    document.addEventListener('click', (e) => {
+      // 1. Ignore if user was swiping or dragging
+      if (hasJustSwiped || isMouseDragging) return;
+      // 2. Ignore clicks on Add to Cart button (handled by addToCart)
+      if (e.target.closest('.btn-add-cart')) return;
+      // 3. Ignore clicks on carousel dots (handled by switchProductSlide)
+      if (e.target.closest('.slider-dot')) return;
+      // 4. Ignore clicks on Quick Specs button (already handled by inline onclick)
+      if (e.target.closest('.quick-view-overlay-btn')) return;
+
+      const card = e.target.closest('.product-card');
+      if (card) {
+        const productId = card.getAttribute('data-id');
+        if (productId && typeof openQuickView === 'function') {
+          openQuickView(productId);
+        }
+      }
+    });
   }
 
   // Global helper for footer collection links
@@ -630,10 +661,22 @@
             const dimText = product.dimensions ? String(product.dimensions).split(' ')[0] : 'Standard';
             const gsmText = product.paperGsm ? String(product.paperGsm).split(' ')[0] : '100';
 
+            const badgeText = (product.badge || (product.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
+            let badgeClass = 'badge-bestseller';
+            if (badgeText === 'NEW') badgeClass = 'badge-new';
+            else if (badgeText === 'LIMITED') badgeClass = 'badge-limited';
+            else if (badgeText === 'TRENDING') badgeClass = 'badge-trending';
+            else if (badgeText === 'SALE') badgeClass = 'badge-sale';
+            else if (badgeText === 'LOW STOCK') badgeClass = 'badge-low-stock';
+
+            const badgeHtml = badgeText
+              ? `<span class="product-badge ${badgeClass}">${escapeHtml(badgeText)}</span>`
+              : '';
+
             const mediaHtml = hasBackCover
               ? `
                 <div class="card-media has-slider">
-                  ${product.isBestseller ? '<span class="badge-bestseller">Bestseller</span>' : ''}
+                  ${badgeHtml}
                   <div class="card-image-slider" data-product-id="${escapeHtml(product.id)}" data-active="0" title="Swipe to view front / back page">
                     <div class="card-slider-track">
                       <div class="card-slide card-slide-front">
@@ -663,7 +706,7 @@
               `
               : `
                 <div class="card-media">
-                  ${product.isBestseller ? '<span class="badge-bestseller">Bestseller</span>' : ''}
+                  ${badgeHtml}
                   <div class="card-media-vector">
                     ${coverSvgHtml}
                   </div>
@@ -813,6 +856,14 @@
       : '';
     const hasBack = Boolean(backCoverHtml);
 
+    const badgeText = (product.badge || (product.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
+    let badgeClass = 'badge-bestseller';
+    if (badgeText === 'NEW') badgeClass = 'badge-new';
+    else if (badgeText === 'LIMITED') badgeClass = 'badge-limited';
+    else if (badgeText === 'TRENDING') badgeClass = 'badge-trending';
+    else if (badgeText === 'SALE') badgeClass = 'badge-sale';
+    else if (badgeText === 'LOW STOCK') badgeClass = 'badge-low-stock';
+
     const savings = product.originalPrice && product.originalPrice > product.price
       ? `<span style="font-size:0.75rem; color:#1EBE5D; font-weight:700; background:#E7F9EE; padding:2px 8px; border-radius:999px; margin-left:6px;">Save ₹${product.originalPrice - product.price}</span>`
       : '';
@@ -852,7 +903,10 @@
       ${artSideHtml}
 
       <div class="quick-view-details-side">
-        <h2 class="modal-product-title">${escapeHtml(product.title)}</h2>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+          <h2 class="modal-product-title" style="margin-bottom: 0;">${escapeHtml(product.title)}</h2>
+          ${badgeText ? `<span class="product-badge ${badgeClass}" style="position: static; font-size: 0.72rem; padding: 3px 10px;">${escapeHtml(badgeText)}</span>` : ''}
+        </div>
         <div class="modal-design-label">Cover Design: ${escapeHtml(product.designName)}</div>
         
         <div class="price-box" style="margin-bottom: 16px;">

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pebble — Store Admin Panel &amp; CMS</title>
   <meta name="description" content="Manage your Pebble bookstore website, customize logo, edit all texts, contact links, and manage products.">
-  <link rel="stylesheet" href="admin.css?v=1.0.3">
+  <link rel="stylesheet" href="admin.css?v=1.0.4">
 </head>
 <body>
 
@@ -783,15 +783,28 @@
           <textarea id="editDescription" class="admin-textarea" rows="2" placeholder="Write book details, paper feel, and craftsmanship notes..."></textarea>
         </div>
 
-        <div style="display: flex; gap: 24px; align-items: center; margin: 12px 0;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
-            <input type="checkbox" id="editInStock" checked style="width: 18px; height: 18px;">
-            In Stock
-          </label>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
-            <input type="checkbox" id="editBestseller" style="width: 18px; height: 18px;">
-            Feature as Bestseller Badge
-          </label>
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin: 14px 0; align-items: end;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="editBadge" style="font-size: 0.85rem; font-weight: 700; margin-bottom: 6px; display: block;">
+              🏷️ Badge:
+            </label>
+            <select id="editBadge" class="admin-select" style="width: 100%; padding: 9px 12px; font-size: 0.88rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: #FFF;">
+              <option value="">None (No Badge)</option>
+              <option value="NEW">New</option>
+              <option value="BESTSELLER">Bestseller</option>
+              <option value="LIMITED">Limited</option>
+              <option value="TRENDING">Trending</option>
+              <option value="SALE">Sale</option>
+              <option value="LOW STOCK">Low Stock</option>
+            </select>
+          </div>
+          <div style="padding-bottom: 8px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+              <input type="checkbox" id="editInStock" checked style="width: 18px; height: 18px;">
+              In Stock
+            </label>
+            <input type="checkbox" id="editBestseller" style="display: none;">
+          </div>
         </div>
 
         <div class="modal-actions-row">
@@ -809,8 +822,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js?v=1.0.7"></script>
-  <script src="products.js?v=1.0.7"></script>
-  <script src="admin.js?v=1.0.7"></script>
+  <script src="firebase-config.js?v=1.0.8"></script>
+  <script src="products.js?v=1.0.8"></script>
+  <script src="admin.js?v=1.0.8"></script>
 </body>
 </html>

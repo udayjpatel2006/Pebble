@@ -85,6 +85,7 @@ const DEFAULT_PRODUCTS = [
     rating: 4.9,
     reviewsCount: 38,
     isBestseller: true,
+    badge: "BESTSELLER",
     description: "Handcrafted daily companion featuring the signature Terracotta Botanica cover art. Thick 120 GSM ivory pages are fountain-pen friendly with zero ink ghosting. Includes ribbon bookmark, elastic closure, and expandable inner pocket.",
     coverColor: "#C86446",
     patternType: "botanical",
@@ -108,7 +109,8 @@ const DEFAULT_PRODUCTS = [
     inStock: true,
     rating: 5.0,
     reviewsCount: 52,
-    isBestseller: true,
+    isBestseller: false,
+    badge: "TRENDING",
     description: "Deep oceanic blue canvas embossed with shimmering silver star maps and celestial constellations. 240 smooth pages engineered to open completely flat at 180 degrees for an effortless writing experience.",
     coverColor: "#1B2A47",
     patternType: "constellation",
@@ -133,6 +135,7 @@ const DEFAULT_PRODUCTS = [
     rating: 4.8,
     reviewsCount: 29,
     isBestseller: false,
+    badge: "NEW",
     description: "A premium artist sketchbook built for gouache, watercolors, fineliners, and graphite. The 160 GSM archival cartridge paper offers zero bleeding and handles light water washes with ease.",
     coverColor: "#54606E",
     patternType: "minimalist",
@@ -156,6 +159,7 @@ const DEFAULT_PRODUCTS = [
     rating: 4.9,
     reviewsCount: 44,
     isBestseller: true,
+    badge: "BESTSELLER",
     description: "Master your days with our undated 12-month productivity planner. Designed with habit trackers, goal roadmaps, priority matrices, and dot-grid reflection spaces.",
     coverColor: "#D99B26",
     patternType: "sunburst",
@@ -180,6 +184,7 @@ const DEFAULT_PRODUCTS = [
     rating: 4.7,
     reviewsCount: 19,
     isBestseller: false,
+    badge: "LIMITED",
     description: "A duo of featherweight pocket notebooks created for quick sketches, sudden thoughts, and travel notes. Compact rounded corners fit smoothly into jeans, coats, or tote bags.",
     coverColor: "#4A6B5D",
     patternType: "duotone",
@@ -203,6 +208,7 @@ const DEFAULT_PRODUCTS = [
     rating: 4.9,
     reviewsCount: 31,
     isBestseller: false,
+    badge: "SALE",
     description: "Inspired by 19th-century herbarium logs. Rich deep emerald fabric with warm amber fern debossing. Features double satin ribbons and archival acid-free paper designed to preserve thoughts for a lifetime.",
     coverColor: "#2F4838",
     patternType: "fern",
@@ -226,6 +232,7 @@ const DEFAULT_PRODUCTS = [
     rating: 4.8,
     reviewsCount: 23,
     isBestseller: false,
+    badge: "LOW STOCK",
     description: "Modern architectural terrazzo stone pattern printed on durable tear-resistant covers. Ideal for technical notes, bullet journaling, and quick daily task lists at your desk.",
     coverColor: "#2D3136",
     patternType: "terrazzo",
@@ -249,6 +256,7 @@ const DEFAULT_PRODUCTS = [
     rating: 5.0,
     reviewsCount: 67,
     isBestseller: true,
+    badge: "BESTSELLER",
     description: "An intentional self-care journal with soft tactile wave embossing. Includes morning reflections, evening gratitude prompts, and 120 open free-form dotted pages.",
     coverColor: "#B56B52",
     patternType: "waves",
@@ -272,6 +280,7 @@ const DEFAULT_PRODUCTS = [
     rating: 4.9,
     reviewsCount: 18,
     isBestseller: false,
+    badge: "NEW",
     description: "Created specifically for watercolorists, charcoal artists, and acrylic sketchers. 200 GSM cold-press paper with natural deckled edges and high absorbency.",
     coverColor: "#694838",
     patternType: "textured",
@@ -323,6 +332,9 @@ function getProducts() {
           const defaultItem = DEFAULT_PRODUCTS.find((d) => d.id === item.id);
           if (defaultItem && defaultItem.customBackImageUrl && (!item.customBackImageUrl || !item.customBackImageUrl.trim())) {
             item.customBackImageUrl = defaultItem.customBackImageUrl;
+          }
+          if (defaultItem && defaultItem.badge && (!item.badge || !item.badge.trim())) {
+            item.badge = defaultItem.badge;
           }
           return item;
         });

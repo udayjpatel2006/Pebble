@@ -153,6 +153,7 @@
   const editDescription = document.getElementById('editDescription');
   const editInStock = document.getElementById('editInStock');
   const editBestseller = document.getElementById('editBestseller');
+  const editBadge = document.getElementById('editBadge');
 
   const adminToastContainer = document.getElementById('adminToastContainer');
 
@@ -410,6 +411,11 @@
               ...def,
               ...local,
               ...cp,
+              badge: (cp.badge && String(cp.badge).trim())
+                || (local.badge && String(local.badge).trim())
+                || (def.badge && String(def.badge).trim())
+                || (cp.isBestseller ? 'BESTSELLER' : '')
+                || '',
               customBackImageUrl: (cp.customBackImageUrl && cp.customBackImageUrl.trim())
                 || (local.customBackImageUrl && local.customBackImageUrl.trim())
                 || (def.customBackImageUrl && def.customBackImageUrl.trim())
@@ -1142,7 +1148,9 @@
           ? '<span class="badge-stock-in">In Stock</span>'
           : '<span class="badge-stock-out">Out of Stock</span>';
 
-        const bestsellerStar = p.isBestseller ? ' ⭐' : '';
+        const badgeText = (p.badge || (p.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
+        const badgeClass = badgeText ? 'table-badge-' + badgeText.toLowerCase().replace(/\s+/g, '-') : '';
+        const badgePill = badgeText ? `<span class="table-badge-pill ${badgeClass}">${escapeHtml(badgeText)}</span>` : '';
         const hasBackCover = Boolean((p.customBackImageUrl && p.customBackImageUrl.trim()) || (p.backImageUrl && p.backImageUrl.trim()));
         const backCoverBadge = hasBackCover
           ? '<span style="display:inline-block; font-size:0.68rem; font-weight:700; background:#EDE7F8; color:#7C3AED; padding:2px 6px; border-radius:999px; margin-top:3px;">Front + Back</span>'
@@ -1156,7 +1164,7 @@
               </div>
             </td>
             <td class="table-title-cell">
-              <strong>${escapeHtml(p.designName)}${bestsellerStar}</strong>
+              <strong>${escapeHtml(p.designName)}</strong>${badgePill}
               <span style="color: var(--text-muted); font-size: 0.8rem;">${escapeHtml(p.title)}</span>
               ${backCoverBadge ? `<div>${backCoverBadge}</div>` : ''}
             </td>
@@ -1198,6 +1206,7 @@
     if (editBackImageFile) editBackImageFile.value = '';
     editInStock.checked = true;
     editBestseller.checked = false;
+    if (editBadge) editBadge.value = '';
 
     productEditModal.classList.add('open');
     productEditModal.setAttribute('aria-hidden', 'false');
@@ -1237,6 +1246,9 @@
     editDescription.value = product.description || '';
     editInStock.checked = product.inStock !== false;
     editBestseller.checked = Boolean(product.isBestseller);
+    if (editBadge) {
+      editBadge.value = product.badge ? product.badge.toUpperCase() : (product.isBestseller ? 'BESTSELLER' : '');
+    }
 
     productEditModal.classList.add('open');
     productEditModal.setAttribute('aria-hidden', 'false');
@@ -1277,7 +1289,8 @@
       inStock: editInStock.checked,
       rating: 5.0,
       reviewsCount: 1,
-      isBestseller: editBestseller.checked,
+      badge: editBadge ? editBadge.value.trim().toUpperCase() : (editBestseller.checked ? 'BESTSELLER' : ''),
+      isBestseller: (editBadge && editBadge.value.trim().toUpperCase() === 'BESTSELLER') || editBestseller.checked,
       description: editDescription.value.trim() || 'Crafted with premium archival paper.',
       customImageUrl: editCustomImageUrl.value.trim(),
       customBackImageUrl: editBackImageUrl ? editBackImageUrl.value.trim() : ''
