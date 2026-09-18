@@ -280,6 +280,7 @@
   }
 
   async function uploadToServerOrFallback(dataUri, originalName, folder) {
+    // 1. Try local server first if available
     try {
       const resp = await fetch('/api/upload', {
         method: 'POST',
@@ -297,8 +298,31 @@
         }
       }
     } catch (err) {
-      console.warn('Local upload endpoint unreachable, falling back to data URL:', err.message);
+      console.warn('Local upload endpoint notice:', err.message);
     }
+
+    // 2. Try Firebase Storage if configured
+    if (typeof firebaseStorage !== 'undefined' && firebaseStorage && typeof isFirebaseConfigured !== 'undefined' && isFirebaseConfigured) {
+      try {
+        const fileName = `${Date.now()}_${originalName.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+        const storageRef = firebaseStorage.ref().child(`${folder}/${fileName}`);
+        const byteString = atob(dataUri.split(',')[1]);
+        const mimeString = dataUri.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: mimeString });
+        const snapshot = await storageRef.put(blob);
+        const downloadUrl = await snapshot.ref.getDownloadURL();
+        console.log('[Pebble Firebase Storage] Uploaded:', downloadUrl);
+        return downloadUrl;
+      } catch (fbErr) {
+        console.warn('Firebase Storage notice:', fbErr.message);
+      }
+    }
+
     return dataUri;
   }
 
@@ -376,8 +400,35 @@
         }
 
         if (Array.isArray(cloudProds) && cloudProds.length > 0) {
-          productsList = cloudProds;
-          saveProducts(cloudProds);
+          const currentLocal = Array.isArray(productsList) ? productsList : [];
+          const defProds = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS)) ? DEFAULT_PRODUCTS : [];
+
+          const merged = cloudProds.map((cp) => {
+            const local = currentLocal.find((p) => p.id === cp.id) || {};
+            const def = defProds.find((d) => d.id === cp.id) || {};
+            return {
+              ...def,
+              ...local,
+              ...cp,
+              customBackImageUrl: (cp.customBackImageUrl && cp.customBackImageUrl.trim())
+                || (local.customBackImageUrl && local.customBackImageUrl.trim())
+                || (def.customBackImageUrl && def.customBackImageUrl.trim())
+                || '',
+              customImageUrl: (cp.customImageUrl && cp.customImageUrl.trim())
+                || (local.customImageUrl && local.customImageUrl.trim())
+                || (def.customImageUrl && def.customImageUrl.trim())
+                || ''
+            };
+          });
+
+          currentLocal.forEach((lp) => {
+            if (!merged.some((m) => m.id === lp.id)) {
+              merged.push(lp);
+            }
+          });
+
+          productsList = merged;
+          saveProducts(productsList);
           renderProductsTable();
           hasChange = true;
         }
@@ -1196,7 +1247,7 @@
     productEditModal.setAttribute('aria-hidden', 'true');
   }
 
-  function handleProductFormSubmit(e) {
+  async function handleProductFormSubmit(e) {
     e.preventDefault();
 
     const id = editProductId.value.trim() || 'peb-' + Date.now();
@@ -1243,7 +1294,11 @@
 
     saveProducts(productsList);
     if (typeof saveCloudProduct === 'function') {
-      saveCloudProduct(newProduct);
+      try {
+        await saveCloudProduct(newProduct);
+      } catch (cloudErr) {
+        console.warn('Cloud save warning:', cloudErr);
+      }
     }
     renderProductsTable();
     closeProductModal();
