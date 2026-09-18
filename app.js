@@ -387,6 +387,118 @@
         window.location.href = 'admin.html';
       });
     }
+
+    // Initialize card gestures for touch swipe and desktop drag
+    initProductCardGestures();
+  }
+
+  // ==========================================
+  // HORIZONTAL SWIPE & DRAG FOR BOOK COVERS
+  // ==========================================
+  function initProductCardGestures() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let activeSlider = null;
+    let isHorizontalSwipe = false;
+    let isVerticalScroll = false;
+
+    // Mobile touch gestures
+    document.addEventListener('touchstart', (e) => {
+      const slider = e.target.closest('.card-image-slider');
+      if (!slider) return;
+      if (e.target.closest('.quick-view-overlay-btn, .slider-dot')) return;
+
+      activeSlider = slider;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      isHorizontalSwipe = false;
+      isVerticalScroll = false;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!activeSlider || isVerticalScroll) return;
+
+      const currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+      const deltaX = currentX - touchStartX;
+      const deltaY = currentY - touchStartY;
+
+      if (!isHorizontalSwipe && !isVerticalScroll) {
+        if (Math.abs(deltaY) > 8 && Math.abs(deltaY) >= Math.abs(deltaX)) {
+          // User is scrolling the page vertically -> allow natural scroll without interception
+          isVerticalScroll = true;
+          return;
+        }
+        if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY)) {
+          // User is swiping book image horizontally
+          isHorizontalSwipe = true;
+        }
+      }
+
+      if (isHorizontalSwipe) {
+        if (e.cancelable) e.preventDefault();
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchend', (e) => {
+      if (!activeSlider) return;
+      if (isHorizontalSwipe) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const deltaX = touchEndX - touchStartX;
+        if (deltaX < -35) {
+          // Swiped Left -> Show Back Cover
+          setProductSliderIndex(activeSlider, 1);
+        } else if (deltaX > 35) {
+          // Swiped Right -> Show Front Cover
+          setProductSliderIndex(activeSlider, 0);
+        }
+      }
+      activeSlider = null;
+      isHorizontalSwipe = false;
+      isVerticalScroll = false;
+    }, { passive: true });
+
+    // Desktop mouse drag gestures
+    let mouseStartX = 0;
+    let mouseActiveSlider = null;
+    let isMouseDragging = false;
+
+    document.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      const slider = e.target.closest('.card-image-slider');
+      if (!slider) return;
+      if (e.target.closest('.quick-view-overlay-btn, .slider-dot')) return;
+
+      mouseActiveSlider = slider;
+      mouseStartX = e.clientX;
+      isMouseDragging = false;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!mouseActiveSlider) return;
+      const deltaX = e.clientX - mouseStartX;
+      if (Math.abs(deltaX) > 6) {
+        isMouseDragging = true;
+        mouseActiveSlider.classList.add('is-dragging');
+      }
+    });
+
+    function finishMouseDrag(e) {
+      if (!mouseActiveSlider) return;
+      if (isMouseDragging) {
+        const deltaX = e.clientX - mouseStartX;
+        if (deltaX < -35) {
+          setProductSliderIndex(mouseActiveSlider, 1);
+        } else if (deltaX > 35) {
+          setProductSliderIndex(mouseActiveSlider, 0);
+        }
+      }
+      mouseActiveSlider.classList.remove('is-dragging');
+      mouseActiveSlider = null;
+      isMouseDragging = false;
+    }
+
+    document.addEventListener('mouseup', finishMouseDrag);
   }
 
   // Global helper for footer collection links
@@ -469,6 +581,12 @@
               ? getBookCoverSvg(product)
               : '';
 
+            const backCoverHtml = (typeof getBookBackCoverHtml === 'function')
+              ? getBookBackCoverHtml(product)
+              : '';
+
+            const hasBackCover = Boolean(backCoverHtml);
+
             const origPriceHtml = product.originalPrice && product.originalPrice > product.price
               ? `<span class="price-original">₹${product.originalPrice}</span>`
               : '';
@@ -476,21 +594,56 @@
             const dimText = product.dimensions ? String(product.dimensions).split(' ')[0] : 'Standard';
             const gsmText = product.paperGsm ? String(product.paperGsm).split(' ')[0] : '100';
 
+            const mediaHtml = hasBackCover
+              ? `
+                <div class="card-media has-slider">
+                  ${product.isBestseller ? '<span class="badge-bestseller">Bestseller</span>' : ''}
+                  <div class="card-image-slider" data-product-id="${escapeHtml(product.id)}" data-active="0" title="Swipe to view front / back page">
+                    <div class="card-slider-track">
+                      <div class="card-slide card-slide-front">
+                        <div class="card-media-vector">
+                          ${coverSvgHtml}
+                        </div>
+                      </div>
+                      <div class="card-slide card-slide-back">
+                        <div class="card-media-vector">
+                          ${backCoverHtml}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="card-slider-dots" role="tablist" aria-label="Book covers">
+                      <button type="button" class="slider-dot active" data-slide="0" aria-label="View front page" onclick="switchProductSlide(event, '${escapeHtml(product.id)}', 0)"></button>
+                      <button type="button" class="slider-dot" data-slide="1" aria-label="View back page" onclick="switchProductSlide(event, '${escapeHtml(product.id)}', 1)"></button>
+                    </div>
+                  </div>
+                  <button class="quick-view-overlay-btn" onclick="openQuickView('${escapeHtml(product.id)}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    Quick Specs
+                  </button>
+                </div>
+              `
+              : `
+                <div class="card-media">
+                  ${product.isBestseller ? '<span class="badge-bestseller">Bestseller</span>' : ''}
+                  <div class="card-media-vector">
+                    ${coverSvgHtml}
+                  </div>
+                  <button class="quick-view-overlay-btn" onclick="openQuickView('${escapeHtml(product.id)}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    Quick Specs
+                  </button>
+                </div>
+              `;
+
             return `
             <article class="product-card" data-id="${escapeHtml(product.id)}">
-              <div class="card-media">
-                ${product.isBestseller ? '<span class="badge-bestseller">Bestseller</span>' : ''}
-                <div class="card-media-vector">
-                  ${coverSvgHtml}
-                </div>
-                <button class="quick-view-overlay-btn" onclick="openQuickView('${escapeHtml(product.id)}')">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                  Quick Specs
-                </button>
-              </div>
+              ${mediaHtml}
 
               <div class="card-body">
                 <!-- Prominent Design Name & Number of Pages -->
@@ -560,6 +713,58 @@
   };
 
   // ==========================================
+  // PRODUCT CARD SWIPE SLIDER HELPERS
+  // ==========================================
+  window.switchProductSlide = function (e, productId, index) {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    const slider = document.querySelector(`.card-image-slider[data-product-id="${productId}"]`);
+    if (!slider) return;
+    setProductSliderIndex(slider, index);
+  };
+
+  function setProductSliderIndex(slider, index) {
+    const targetIndex = index === 1 ? 1 : 0;
+    slider.setAttribute('data-active', targetIndex);
+    const track = slider.querySelector('.card-slider-track');
+    if (track) {
+      track.style.transform = targetIndex === 1 ? 'translateX(-50%)' : 'translateX(0%)';
+    }
+    const dots = slider.querySelectorAll('.slider-dot');
+    dots.forEach((dot) => {
+      const dotIdx = parseInt(dot.getAttribute('data-slide'), 10);
+      if (dotIdx === targetIndex) {
+        dot.classList.add('active');
+        dot.setAttribute('aria-selected', 'true');
+      } else {
+        dot.classList.remove('active');
+        dot.setAttribute('aria-selected', 'false');
+      }
+    });
+  }
+
+  window.setQuickViewSlide = function(side) {
+    const frontEl = document.getElementById('quickViewFrontArt');
+    const backEl = document.getElementById('quickViewBackArt');
+    const btnFront = document.getElementById('qvBtnFront');
+    const btnBack = document.getElementById('qvBtnBack');
+    if (!frontEl || !backEl) return;
+    if (side === 'back') {
+      frontEl.style.display = 'none';
+      backEl.style.display = 'block';
+      if (btnFront) btnFront.classList.remove('active');
+      if (btnBack) btnBack.classList.add('active');
+    } else {
+      frontEl.style.display = 'block';
+      backEl.style.display = 'none';
+      if (btnFront) btnFront.classList.add('active');
+      if (btnBack) btnBack.classList.remove('active');
+    }
+  };
+
+  // ==========================================
   // QUICK VIEW MODAL
   // ==========================================
   window.openQuickView = function (productId) {
@@ -567,21 +772,48 @@
     if (!product) return;
 
     const coverSvgHtml = getBookCoverSvg(product);
+    const backCoverHtml = (typeof getBookBackCoverHtml === 'function')
+      ? getBookBackCoverHtml(product)
+      : '';
+    const hasBack = Boolean(backCoverHtml);
+
     const savings = product.originalPrice && product.originalPrice > product.price
       ? `<span style="font-size:0.75rem; color:#1EBE5D; font-weight:700; background:#E7F9EE; padding:2px 8px; border-radius:999px; margin-left:6px;">Save ₹${product.originalPrice - product.price}</span>`
       : '';
 
+    const artSideHtml = hasBack
+      ? `
+        <div class="quick-view-art-side">
+          <div id="quickViewArtContainer" style="width: 220px; max-width: 100%;">
+            <div id="quickViewFrontArt">${coverSvgHtml}</div>
+            <div id="quickViewBackArt" style="display: none;">${backCoverHtml}</div>
+          </div>
+          <div class="quick-view-cover-toggle">
+            <button type="button" id="qvBtnFront" class="btn-qv-toggle active" onclick="setQuickViewSlide('front')">Front Cover</button>
+            <button type="button" id="qvBtnBack" class="btn-qv-toggle" onclick="setQuickViewSlide('back')">Back Cover</button>
+          </div>
+          <div style="margin-top: 14px; text-align: center;">
+            <span style="display:inline-block; background: var(--color-primary-light); color: var(--color-primary); font-weight:700; font-size:0.8rem; padding: 4px 12px; border-radius: 999px;">
+              Design: ${escapeHtml(product.designName)}
+            </span>
+          </div>
+        </div>
+      `
+      : `
+        <div class="quick-view-art-side">
+          <div style="width: 220px; max-width: 100%;">
+            ${coverSvgHtml}
+          </div>
+          <div style="margin-top: 18px; text-align: center;">
+            <span style="display:inline-block; background: var(--color-primary-light); color: var(--color-primary); font-weight:700; font-size:0.8rem; padding: 4px 12px; border-radius: 999px;">
+              Design: ${escapeHtml(product.designName)}
+            </span>
+          </div>
+        </div>
+      `;
+
     quickViewContent.innerHTML = `
-      <div class="quick-view-art-side">
-        <div style="width: 220px; max-width: 100%;">
-          ${coverSvgHtml}
-        </div>
-        <div style="margin-top: 18px; text-align: center;">
-          <span style="display:inline-block; background: var(--color-primary-light); color: var(--color-primary); font-weight:700; font-size:0.8rem; padding: 4px 12px; border-radius: 999px;">
-            Design: ${escapeHtml(product.designName)}
-          </span>
-        </div>
-      </div>
+      ${artSideHtml}
 
       <div class="quick-view-details-side">
         <h2 class="modal-product-title">${escapeHtml(product.title)}</h2>
@@ -707,6 +939,7 @@
         coverColor: product.coverColor,
         patternType: product.patternType,
         customImageUrl: product.customImageUrl,
+        customBackImageUrl: product.customBackImageUrl || product.backImageUrl || '',
         quantity: quantity
       });
     }
