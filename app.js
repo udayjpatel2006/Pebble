@@ -1072,6 +1072,8 @@
         `;
         })
         .join('');
+    }
+
     // Sticky Mobile Cart bottom bar sync
     const stickyCart = document.getElementById('stickyMobileCart');
     const stickyCartCount = document.getElementById('stickyMobileCartCount');
