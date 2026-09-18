@@ -760,7 +760,7 @@ img, svg {
 /* Book Mockup Preview Box */
 .card-media {
   background: var(--color-bg-subtle);
-  padding: 20px 16px 14px;
+  padding: 16px 14px 12px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -768,6 +768,16 @@ img, svg {
   overflow: hidden;
   border-bottom: 1px solid var(--color-border);
   min-height: 240px;
+  height: 250px;
+}
+
+.card-media.has-slider {
+  padding: 0;
+  display: block;
+  position: relative;
+  overflow: hidden;
+  min-height: 240px;
+  height: 250px;
 }
 
 .card-media-vector {
@@ -790,10 +800,7 @@ img, svg {
   height: 100%;
   overflow: hidden;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  display: block;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -806,8 +813,12 @@ img, svg {
 
 .card-slider-track {
   display: flex;
+  flex-direction: row;
   width: 200%;
   height: 100%;
+  margin: 0;
+  padding: 0;
+  transform: translateX(0%);
   transition: transform 0.32s cubic-bezier(0.25, 1, 0.5, 1);
   will-change: transform;
 }
@@ -816,6 +827,17 @@ img, svg {
   width: 50%;
   flex: 0 0 50%;
   height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 14px 10px 12px;
+}
+
+.card-slide .card-media-vector {
+  width: 100%;
+  max-width: 165px;
+  height: 225px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -2027,10 +2049,11 @@ img, svg {
     max-width: 170px;
   }
 
-  /* PRODUCT GRID: 2 columns on wide mobile / small tablet (481px - 768px) */
+  /* PRODUCT GRID: 2 columns on tablet & mobile */
   .product-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px 10px;
     width: 100%;
   }
   .product-card {
@@ -2039,48 +2062,62 @@ img, svg {
     box-sizing: border-box;
   }
   .card-media {
-    height: 230px;
-    padding: 14px 10px;
+    height: 200px;
+    min-height: 200px;
+    padding: 10px 6px;
+  }
+  .card-media.has-slider {
+    height: 200px;
+    min-height: 200px;
+    padding: 0;
+  }
+  .card-slide {
+    padding: 10px 6px;
   }
   .card-media-vector {
-    height: 195px;
-    max-width: 150px;
+    height: 175px;
+    max-width: 130px;
+  }
+  .card-slide .card-media-vector {
+    height: 175px;
+    max-width: 130px;
   }
   /* Show quick specs button on touch/mobile devices for instant access */
   .quick-view-overlay-btn {
     opacity: 0.95;
     transform: none;
-    bottom: 10px;
-    font-size: 0.76rem;
-    padding: 5px 12px;
+    bottom: 8px;
+    font-size: 0.72rem;
+    padding: 4px 10px;
     background: #FFFFFF;
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   }
   .card-media.has-slider .quick-view-overlay-btn {
-    bottom: 24px;
+    bottom: 22px;
   }
   .card-body {
-    padding: 14px 12px;
+    padding: 12px 10px;
     min-width: 0;
   }
   .card-title {
-    font-size: 1.12rem;
+    font-size: 0.96rem;
+    line-height: 1.25;
     word-break: break-word;
     overflow-wrap: break-word;
   }
   .card-footer-row {
-    padding-top: 12px;
-    gap: 8px;
+    padding-top: 10px;
+    gap: 6px;
     flex-wrap: wrap;
   }
   .price-main {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     white-space: nowrap;
   }
   .btn-add-cart {
-    padding: 8px 16px;
-    font-size: 0.85rem;
-    min-height: 40px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+    min-height: 36px;
     white-space: nowrap;
     flex-shrink: 0;
   }
@@ -2142,33 +2179,128 @@ img, svg {
     font-size: 0.78rem;
     padding: 6px 12px;
   }
-  /* PRODUCT GRID: Exactly 1 column on mobile portrait matching reference screenshot */
+  /* PRODUCT GRID: Exactly 2 columns on mobile matching Flipkart reference screenshot (4 cards visible on screen) */
   .product-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px 8px;
     width: 100%;
   }
+  .product-card {
+    border-radius: 12px;
+  }
   .card-media {
-    height: 240px;
-    padding: 16px;
+    height: 165px;
+    min-height: 165px;
+    padding: 8px 4px;
+  }
+  .card-media.has-slider {
+    height: 165px;
+    min-height: 165px;
+    padding: 0;
+  }
+  .card-slide {
+    padding: 8px 4px;
   }
   .card-media-vector {
-    height: 210px;
-    max-width: 170px;
+    height: 145px;
+    max-width: 108px;
+  }
+  .card-slide .card-media-vector {
+    height: 145px;
+    max-width: 108px;
+  }
+  .quick-view-overlay-btn {
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    bottom: 6px;
+    gap: 4px;
+  }
+  .card-media.has-slider .quick-view-overlay-btn {
+    bottom: 18px;
+  }
+  .card-slider-dots {
+    bottom: 4px;
+    gap: 4px;
+  }
+  .slider-dot {
+    width: 5px;
+    height: 5px;
+  }
+  .slider-dot.active {
+    width: 12px;
+    height: 5px;
+  }
+  .badge-bestseller {
+    font-size: 0.58rem;
+    padding: 2px 6px;
+    top: 6px;
+    left: 6px;
   }
   .card-body {
-    padding: 16px;
+    padding: 8px 8px 10px;
     min-width: 0;
   }
+  .design-spec-badge-row {
+    gap: 3px;
+    margin-bottom: 4px;
+  }
+  .design-name-chip, .pages-count-chip {
+    font-size: 0.60rem;
+    padding: 2px 4px;
+  }
+  .card-title {
+    font-size: 0.84rem;
+    line-height: 1.22;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.1em;
+    max-height: 2.44em;
+  }
+  .card-design-subtitle {
+    font-size: 0.70rem;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-specs-mini {
+    gap: 3px;
+    margin-bottom: 6px;
+    flex-wrap: nowrap;
+    overflow-x: hidden;
+  }
+  .spec-mini-item {
+    font-size: 0.58rem;
+    padding: 1px 4px;
+  }
   .card-footer-row {
+    padding-top: 6px;
+    gap: 4px;
     flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
   }
   .price-box {
     flex: 1;
+    min-width: 0;
+  }
+  .price-main {
+    font-size: 1.0rem;
+    gap: 3px;
+  }
+  .price-original {
+    font-size: 0.65rem;
   }
   .btn-add-cart {
     flex: 0 0 auto;
+    padding: 6px 9px;
+    font-size: 0.76rem;
+    min-height: 30px;
+    gap: 3px;
   }
 }
 

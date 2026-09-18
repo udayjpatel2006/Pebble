@@ -481,10 +481,10 @@
       if (isHorizontalSwipe) {
         const touchEndX = e.changedTouches[0].clientX;
         const deltaX = touchEndX - touchStartX;
-        if (deltaX < -35) {
+        if (deltaX < -24) {
           // Swiped Left -> Show Back Cover
           setProductSliderIndex(activeSlider, 1);
-        } else if (deltaX > 35) {
+        } else if (deltaX > 24) {
           // Swiped Right -> Show Front Cover
           setProductSliderIndex(activeSlider, 0);
         }
@@ -523,9 +523,9 @@
       if (!mouseActiveSlider) return;
       if (isMouseDragging) {
         const deltaX = e.clientX - mouseStartX;
-        if (deltaX < -35) {
+        if (deltaX < -24) {
           setProductSliderIndex(mouseActiveSlider, 1);
-        } else if (deltaX > 35) {
+        } else if (deltaX > 24) {
           setProductSliderIndex(mouseActiveSlider, 0);
         }
       }
