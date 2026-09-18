@@ -146,6 +146,10 @@
   const editCustomImageFile = document.getElementById('editCustomImageFile');
   const editCustomImageUrl = document.getElementById('editCustomImageUrl');
   const clearCoverImgBtn = document.getElementById('clearCoverImgBtn');
+  const backDesignPreviewImg = document.getElementById('backDesignPreviewImg');
+  const editBackImageFile = document.getElementById('editBackImageFile');
+  const editBackImageUrl = document.getElementById('editBackImageUrl');
+  const clearBackImgBtn = document.getElementById('clearBackImgBtn');
   const editDescription = document.getElementById('editDescription');
   const editInStock = document.getElementById('editInStock');
   const editBestseller = document.getElementById('editBestseller');
@@ -913,7 +917,47 @@
           coverDesignPreviewImg.src = 'assets/pebble-logo.svg';
         }
         if (editCustomImageFile) editCustomImageFile.value = '';
-        showToast('Cover design image cleared.');
+        showToast('Front cover image cleared.');
+      });
+    }
+
+    // Custom Back Cover Image Upload for Book (Optional)
+    if (editBackImageFile) {
+      editBackImageFile.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          showToast('Uploading & optimizing back cover...');
+          const uploadedUrl = await processAndUploadImage(file, 'covers');
+          if (editBackImageUrl) editBackImageUrl.value = uploadedUrl;
+          if (backDesignPreviewImg) {
+            backDesignPreviewImg.src = uploadedUrl;
+          }
+          showToast('✅ Back cover loaded! Click "Save Book Details" below.');
+        } catch (err) {
+          showToast('Back cover upload error: ' + err.message);
+        }
+      });
+    }
+
+    if (editBackImageUrl) {
+      editBackImageUrl.addEventListener('input', (e) => {
+        const url = e.target.value.trim();
+        if (backDesignPreviewImg) {
+          backDesignPreviewImg.src = url || 'assets/pebble-logo.svg';
+        }
+      });
+    }
+
+    if (clearBackImgBtn) {
+      clearBackImgBtn.addEventListener('click', () => {
+        if (editBackImageUrl) editBackImageUrl.value = '';
+        if (backDesignPreviewImg) {
+          backDesignPreviewImg.src = 'assets/pebble-logo.svg';
+        }
+        if (editBackImageFile) editBackImageFile.value = '';
+        showToast('Back cover image cleared.');
       });
     }
 
@@ -1040,7 +1084,7 @@
     adminProductsTableBody.innerHTML = filtered
       .map((p) => {
         const thumb = p.customImageUrl
-          ? `<img src="${p.customImageUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;" alt="cover">`
+          ? `<img src="${p.customImageUrl}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 4px;" alt="cover">`
           : `<div style="width: 100%; height: 100%; background: #FAF7F2; border: 1px dashed #C86446; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #8C7B6B; font-size: 0.65rem; font-weight: 700; border-radius: 4px;">📖<span style="font-size: 0.58rem;">${p.pages}p</span></div>`;
 
         const stockBadge = p.inStock !== false
@@ -1048,6 +1092,10 @@
           : '<span class="badge-stock-out">Out of Stock</span>';
 
         const bestsellerStar = p.isBestseller ? ' ⭐' : '';
+        const hasBackCover = Boolean((p.customBackImageUrl && p.customBackImageUrl.trim()) || (p.backImageUrl && p.backImageUrl.trim()));
+        const backCoverBadge = hasBackCover
+          ? '<span style="display:inline-block; font-size:0.68rem; font-weight:700; background:#EDE7F8; color:#7C3AED; padding:2px 6px; border-radius:999px; margin-top:3px;">Front + Back</span>'
+          : '';
 
         return `
           <tr>
@@ -1059,6 +1107,7 @@
             <td class="table-title-cell">
               <strong>${escapeHtml(p.designName)}${bestsellerStar}</strong>
               <span style="color: var(--text-muted); font-size: 0.8rem;">${escapeHtml(p.title)}</span>
+              ${backCoverBadge ? `<div>${backCoverBadge}</div>` : ''}
             </td>
             <td><strong>${p.pages}</strong> pages</td>
             <td>
@@ -1091,6 +1140,11 @@
       coverDesignPreviewImg.src = 'assets/pebble-logo.svg';
     }
     if (editCustomImageFile) editCustomImageFile.value = '';
+    if (editBackImageUrl) editBackImageUrl.value = '';
+    if (backDesignPreviewImg) {
+      backDesignPreviewImg.src = 'assets/pebble-logo.svg';
+    }
+    if (editBackImageFile) editBackImageFile.value = '';
     editInStock.checked = true;
     editBestseller.checked = false;
 
@@ -1121,6 +1175,14 @@
       coverDesignPreviewImg.src = product.customImageUrl || 'assets/pebble-logo.svg';
     }
     if (editCustomImageFile) editCustomImageFile.value = '';
+
+    const backUrl = product.customBackImageUrl || product.backImageUrl || '';
+    if (editBackImageUrl) editBackImageUrl.value = backUrl;
+    if (backDesignPreviewImg) {
+      backDesignPreviewImg.src = backUrl || 'assets/pebble-logo.svg';
+    }
+    if (editBackImageFile) editBackImageFile.value = '';
+
     editDescription.value = product.description || '';
     editInStock.checked = product.inStock !== false;
     editBestseller.checked = Boolean(product.isBestseller);
@@ -1166,7 +1228,8 @@
       reviewsCount: 1,
       isBestseller: editBestseller.checked,
       description: editDescription.value.trim() || 'Crafted with premium archival paper.',
-      customImageUrl: editCustomImageUrl.value.trim()
+      customImageUrl: editCustomImageUrl.value.trim(),
+      customBackImageUrl: editBackImageUrl ? editBackImageUrl.value.trim() : ''
     };
 
     const existingIndex = productsList.findIndex((p) => p.id === id);

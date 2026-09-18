@@ -686,19 +686,19 @@
           </div>
         </div>
 
-        <!-- Book Cover Artwork Upload (Colour selection removed as requested) -->
+        <!-- Front Page / Product Image Upload -->
         <div class="admin-card cover-upload-card" style="margin: 12px 0; background: #FAF7F2; border: 1px solid #EFE8DC; padding: 18px; border-radius: 8px;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
             <div>
               <h4 style="font-size: 0.96rem; margin-bottom: 3px; color: var(--color-primary); font-weight: 700;">
-                Book Cover Design Image *
+                Front Page / Product Image *
               </h4>
               <p class="field-hint" style="margin-bottom: 0;">
-                Upload your custom book cover artwork image. This design will be displayed on the storefront catalog cards and detail modal.
+                Upload front cover artwork image. Displayed as the default book cover on the storefront.
               </p>
             </div>
             <span class="badge-design-only" style="background: #E8DFD3; color: #5C4A3A; font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
-              Image Cover
+              Front Cover
             </span>
           </div>
 
@@ -706,7 +706,7 @@
             <!-- Real-time Live Preview of Cover Image -->
             <div class="book-cover-preview-frame" id="coverDesignPreviewFrame">
               <img id="coverDesignPreviewImg" src="assets/pebble-logo.svg" alt="Cover Preview">
-              <div class="cover-preview-tag" id="coverPreviewTag">Live Preview</div>
+              <div class="cover-preview-tag" id="coverPreviewTag">Front</div>
             </div>
 
             <!-- Upload Controls -->
@@ -714,7 +714,7 @@
               <div class="file-upload-wrap" style="margin-bottom: 10px;">
                 <input type="file" id="editCustomImageFile" accept="image/*" class="file-input-hidden">
                 <label for="editCustomImageFile" class="btn-admin-primary" style="cursor: pointer; padding: 10px 18px; font-size: 0.88rem;">
-                  📁 Choose Cover Design File...
+                  📁 Choose Front Cover File...
                 </label>
                 <button type="button" id="clearCoverImgBtn" class="btn-admin-subtle" style="font-size: 0.8rem;">
                   Clear Image
@@ -722,11 +722,57 @@
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
-                <label for="editCustomImageUrl" style="font-size: 0.82rem; font-weight: 600;">Or Cover Image URL / Path:</label>
+                <label for="editCustomImageUrl" style="font-size: 0.82rem; font-weight: 600;">Or Front Cover Image URL / Path:</label>
                 <input type="text" id="editCustomImageUrl" class="admin-input" placeholder="e.g. uploads/covers_123.jpg or https://..." style="font-size: 0.86rem;">
               </div>
               <p class="field-hint" style="margin-top: 6px; font-size: 0.76rem;">
                 Supported formats: PNG, JPG, JPEG, WebP, SVG. High-resolution images are automatically optimized.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Back Page Artwork Upload (Optional) -->
+        <div class="admin-card cover-upload-card" style="margin: 12px 0; background: #FAF7F2; border: 1px solid #EFE8DC; padding: 18px; border-radius: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div>
+              <h4 style="font-size: 0.96rem; margin-bottom: 3px; color: var(--color-primary); font-weight: 700;">
+                Back Page (Optional)
+              </h4>
+              <p class="field-hint" style="margin-bottom: 0;">
+                Upload back cover artwork image. Customers can swipe horizontally between front and back pages on product cards.
+              </p>
+            </div>
+            <span class="badge-design-only" style="background: #E2D9F3; color: #4B337A; font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; font-weight: 600;">
+              Back Cover
+            </span>
+          </div>
+
+          <div class="cover-design-upload-row">
+            <!-- Real-time Live Preview of Back Cover Image -->
+            <div class="book-cover-preview-frame" id="backDesignPreviewFrame">
+              <img id="backDesignPreviewImg" src="assets/pebble-logo.svg" alt="Back Cover Preview">
+              <div class="cover-preview-tag" id="backPreviewTag">Back</div>
+            </div>
+
+            <!-- Upload Controls -->
+            <div class="cover-upload-actions" style="flex: 1;">
+              <div class="file-upload-wrap" style="margin-bottom: 10px;">
+                <input type="file" id="editBackImageFile" accept="image/*" class="file-input-hidden">
+                <label for="editBackImageFile" class="btn-admin-primary" style="cursor: pointer; padding: 10px 18px; font-size: 0.88rem;">
+                  📁 Choose Back Page File...
+                </label>
+                <button type="button" id="clearBackImgBtn" class="btn-admin-subtle" style="font-size: 0.8rem;">
+                  Clear Back Image
+                </button>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="editBackImageUrl" style="font-size: 0.82rem; font-weight: 600;">Or Back Page URL / Path:</label>
+                <input type="text" id="editBackImageUrl" class="admin-input" placeholder="e.g. uploads/covers_456.jpg or https://..." style="font-size: 0.86rem;">
+              </div>
+              <p class="field-hint" style="margin-top: 6px; font-size: 0.76rem;">
+                Optional. Leave empty for single-image products. Existing products without a back page remain unaffected.
               </p>
             </div>
           </div>
@@ -763,8 +809,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js?v=1.0.3"></script>
-  <script src="products.js?v=1.0.3"></script>
-  <script src="admin.js?v=1.0.3"></script>
+  <script src="firebase-config.js?v=1.0.4"></script>
+  <script src="products.js?v=1.0.4"></script>
+  <script src="admin.js?v=1.0.4"></script>
 </body>
 </html>
