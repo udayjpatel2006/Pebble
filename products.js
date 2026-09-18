@@ -88,7 +88,8 @@ const DEFAULT_PRODUCTS = [
     description: "Handcrafted daily companion featuring the signature Terracotta Botanica cover art. Thick 120 GSM ivory pages are fountain-pen friendly with zero ink ghosting. Includes ribbon bookmark, elastic closure, and expandable inner pocket.",
     coverColor: "#C86446",
     patternType: "botanical",
-    customImageUrl: ""
+    customImageUrl: "",
+    customBackImageUrl: "assets/covers/peb-001-back.svg"
   },
   {
     id: "peb-002",
@@ -111,7 +112,8 @@ const DEFAULT_PRODUCTS = [
     description: "Deep oceanic blue canvas embossed with shimmering silver star maps and celestial constellations. 240 smooth pages engineered to open completely flat at 180 degrees for an effortless writing experience.",
     coverColor: "#1B2A47",
     patternType: "constellation",
-    customImageUrl: ""
+    customImageUrl: "",
+    customBackImageUrl: "assets/covers/peb-002-back.svg"
   },
   {
     id: "peb-003",
@@ -157,7 +159,8 @@ const DEFAULT_PRODUCTS = [
     description: "Master your days with our undated 12-month productivity planner. Designed with habit trackers, goal roadmaps, priority matrices, and dot-grid reflection spaces.",
     coverColor: "#D99B26",
     patternType: "sunburst",
-    customImageUrl: ""
+    customImageUrl: "",
+    customBackImageUrl: "assets/covers/peb-004-back.svg"
   },
   {
     id: "peb-005",
@@ -316,7 +319,13 @@ function getProducts() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map((item) => {
+          const defaultItem = DEFAULT_PRODUCTS.find((d) => d.id === item.id);
+          if (defaultItem && defaultItem.customBackImageUrl && (!item.customBackImageUrl || !item.customBackImageUrl.trim())) {
+            item.customBackImageUrl = defaultItem.customBackImageUrl;
+          }
+          return item;
+        });
       }
     }
   } catch (e) {
@@ -541,9 +550,6 @@ function getBookBackCoverHtml(product) {
     return `
       <div class="book-cover-custom-img book-back-cover" style="width: 100%; height: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 24px rgba(25, 23, 20, 0.2); position: relative; display: flex; align-items: center; justify-content: center;">
         <img src="${escapeHtml(backUrl)}" alt="${designLabel} - Back Page" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: contain; display: block;" onerror="this.onerror=null; this.src='assets/pebble-logo.svg';" />
-        <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(255,255,255,0.92); padding: 4px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-align: center; color: #232220;">
-          Back Page
-        </div>
       </div>
     `;
   } catch (err) {

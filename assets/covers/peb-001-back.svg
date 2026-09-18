@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 340" class="book-cover-vector">
+  <defs>
+    <linearGradient id="back-spine-grad-peb-001" x1="100%" y1="0%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#000" stop-opacity="0.35"/>
+      <stop offset="6%" stop-color="#FFF" stop-opacity="0.15"/>
+      <stop offset="12%" stop-color="#000" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="book-shadow-back-001" x="-5%" y="-5%" width="115%" height="115%">
+      <feDropShadow dx="-3" dy="4" stdDeviation="6" flood-color="#14110E" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Book Back Body -->
+  <rect x="15" y="10" width="230" height="320" rx="10" fill="#C86446" filter="url(#book-shadow-back-001)"/>
+
+  <!-- Botanical Flourish Pattern -->
+  <g stroke="#F7EDE2" stroke-width="1.1" opacity="0.35" fill="none">
+    <path d="M50 50 Q75 30 100 60 T140 40" />
+    <circle cx="100" cy="60" r="3" fill="#F7EDE2" />
+    <circle cx="140" cy="40" r="3" fill="#F7EDE2" />
+    <path d="M120 280 Q150 260 180 290 T210 270" />
+    <circle cx="180" cy="290" r="3" fill="#F7EDE2" />
+  </g>
+
+  <!-- Spine Shadow on Right Edge -->
+  <rect x="217" y="10" width="28" height="320" rx="6" fill="url(#back-spine-grad-peb-001)"/>
+
+  <!-- Back Cover Content Frame -->
+  <rect x="34" y="32" width="176" height="268" rx="6" fill="#FDFBF7" opacity="0.94" stroke="#D3C3AD" stroke-width="1"/>
+  <rect x="38" y="36" width="168" height="260" rx="4" fill="none" stroke="#C86446" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.7"/>
+
+  <!-- Header: Brand & Emblem -->
+  <circle cx="122" cy="58" r="12" fill="#FAF5ED" stroke="#C86446" stroke-width="0.8"/>
+  <path d="M116 58 C116 53 128 53 128 58 C128 63 116 63 116 58 Z" fill="#C86446"/>
+  <text x="122" y="79" font-family="'Playfair Display', Georgia, serif" font-size="11" font-weight="700" fill="#232220" text-anchor="middle" letter-spacing="1.2">PEBBLE</text>
+  <text x="122" y="90" font-family="'Inter', sans-serif" font-size="7.5" font-weight="600" fill="#8C7B6B" text-anchor="middle" letter-spacing="0.8">BOOKSCRAFT LANE</text>
+
+  <!-- Divider line -->
+  <line x1="60" y1="100" x2="184" y2="100" stroke="#E2D4C3" stroke-width="0.8"/>
+
+  <!-- Blurb Description -->
+  <text x="122" y="118" font-family="'Playfair Display', Georgia, serif" font-size="10.5" font-style="italic" font-weight="600" fill="#C86446" text-anchor="middle">Terracotta Botanica</text>
+  <text x="122" y="134" font-family="'Inter', sans-serif" font-size="7.5" fill="#4A453E" text-anchor="middle">Artisan Hardbound Daily Journal</text>
+  <text x="122" y="148" font-family="'Inter', sans-serif" font-size="7" fill="#696256" text-anchor="middle">Fountain-pen friendly 120 GSM ivory pages</text>
+  <text x="122" y="160" font-family="'Inter', sans-serif" font-size="7" fill="#696256" text-anchor="middle">engineered with 180° lay-flat section sewing.</text>
+  <text x="122" y="172" font-family="'Inter', sans-serif" font-size="7" fill="#696256" text-anchor="middle">Handmade locally in small artisan batches.</text>
+
+  <!-- Specs Mini Box -->
+  <rect x="48" y="184" width="148" height="34" rx="4" fill="#F4EFE6" stroke="#E0D5C3" stroke-width="0.6"/>
+  <text x="122" y="197" font-family="'Inter', sans-serif" font-size="7" font-weight="700" fill="#232220" text-anchor="middle" letter-spacing="0.5">192 PAGES • DOTTED GRID (5MM)</text>
+  <text x="122" y="210" font-family="'Inter', sans-serif" font-size="6.5" font-weight="600" fill="#8C7B6B" text-anchor="middle">A5 (14.8 × 21.0 CM) • CASE-BOUND</text>
+
+  <!-- Barcode Simulation Area -->
+  <g fill="#232220" opacity="0.85">
+    <rect x="68" y="232" width="2" height="26"/>
+    <rect x="72" y="232" width="1" height="26"/>
+    <rect x="75" y="232" width="3" height="26"/>
+    <rect x="80" y="232" width="1" height="26"/>
+    <rect x="83" y="232" width="2" height="26"/>
+    <rect x="87" y="232" width="4" height="26"/>
+    <rect x="93" y="232" width="1" height="26"/>
+    <rect x="96" y="232" width="2" height="26"/>
+    <rect x="100" y="232" width="3" height="26"/>
+    <rect x="105" y="232" width="1" height="26"/>
+    <rect x="108" y="232" width="2" height="26"/>
+    <rect x="112" y="232" width="4" height="26"/>
+    <rect x="118" y="232" width="1" height="26"/>
+    <rect x="121" y="232" width="2" height="26"/>
+    <rect x="125" y="232" width="3" height="26"/>
+    <rect x="130" y="232" width="1" height="26"/>
+    <rect x="133" y="232" width="2" height="26"/>
+    <rect x="137" y="232" width="4" height="26"/>
+    <rect x="143" y="232" width="1" height="26"/>
+    <rect x="146" y="232" width="2" height="26"/>
+    <rect x="150" y="232" width="3" height="26"/>
+    <rect x="155" y="232" width="2" height="26"/>
+    <rect x="159" y="232" width="1" height="26"/>
+    <rect x="163" y="232" width="3" height="26"/>
+    <rect x="168" y="232" width="2" height="26"/>
+    <rect x="172" y="232" width="2" height="26"/>
+  </g>
+  <text x="122" y="268" font-family="'Inter', sans-serif" font-size="6.5" font-weight="600" fill="#5A5248" text-anchor="middle" letter-spacing="1.5">ISBN 978-81-92345-01-2</text>
+
+  <!-- Tagline at Bottom -->
+  <text x="122" y="284" font-family="'Inter', sans-serif" font-size="6.2" font-weight="500" fill="#8C7B6B" text-anchor="middle">Crafted for thinkers, artists &amp; creators.</text>
+</svg>
