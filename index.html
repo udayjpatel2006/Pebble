@@ -7,7 +7,7 @@
   <meta name="description" content="Local handcrafted books, journals, sketchbooks, and planners with custom designs and archival paper.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=1.0.4">
+  <link rel="stylesheet" href="styles.css?v=1.0.5">
 </head>
 <body>
 
@@ -417,12 +417,31 @@
     </div>
   </footer>
 
+  <!-- Sticky Mobile Cart Bottom Bar (Visible on mobile when cart has products) -->
+  <aside id="stickyMobileCart" class="sticky-mobile-cart" aria-hidden="true" aria-label="Shopping bag summary">
+    <div class="sticky-mobile-cart-inner">
+      <div class="sticky-mobile-cart-info" onclick="openCart()" role="button" tabindex="0" aria-label="View shopping bag">
+        <div class="sticky-mobile-cart-badge-row">
+          <span class="sticky-cart-icon">🛍️</span>
+          <span id="stickyMobileCartCount" class="sticky-cart-count">0 items</span>
+        </div>
+        <div id="stickyMobileCartTotal" class="sticky-cart-total">₹0</div>
+      </div>
+      <button type="button" class="btn-sticky-mobile-cart" id="stickyMobileCartBtn" onclick="openCart()" aria-label="View shopping bag and checkout">
+        <span>View Bag</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+  </aside>
+
   <!-- Firebase SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js?v=1.0.4"></script>
-  <script src="products.js?v=1.0.4"></script>
-  <script src="app.js?v=1.0.4"></script>
+  <script src="firebase-config.js?v=1.0.5"></script>
+  <script src="products.js?v=1.0.5"></script>
+  <script src="app.js?v=1.0.5"></script>
 </body>
 </html>

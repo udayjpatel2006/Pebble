@@ -97,8 +97,35 @@
         }
 
         if (Array.isArray(cloudProds) && cloudProds.length > 0) {
-          productsList = cloudProds;
-          saveProducts(cloudProds);
+          const currentLocal = Array.isArray(productsList) ? productsList : [];
+          const defProds = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS)) ? DEFAULT_PRODUCTS : [];
+
+          const merged = cloudProds.map((cp) => {
+            const local = currentLocal.find((p) => p.id === cp.id) || {};
+            const def = defProds.find((d) => d.id === cp.id) || {};
+            return {
+              ...def,
+              ...local,
+              ...cp,
+              customBackImageUrl: (cp.customBackImageUrl && cp.customBackImageUrl.trim())
+                || (local.customBackImageUrl && local.customBackImageUrl.trim())
+                || (def.customBackImageUrl && def.customBackImageUrl.trim())
+                || '',
+              customImageUrl: (cp.customImageUrl && cp.customImageUrl.trim())
+                || (local.customImageUrl && local.customImageUrl.trim())
+                || (def.customImageUrl && def.customImageUrl.trim())
+                || ''
+            };
+          });
+
+          currentLocal.forEach((lp) => {
+            if (!merged.some((m) => m.id === lp.id)) {
+              merged.push(lp);
+            }
+          });
+
+          productsList = merged;
+          saveProducts(productsList);
           renderProducts();
           hasChange = true;
         }
@@ -304,6 +331,15 @@
     cartBackdrop.addEventListener('click', (e) => {
       if (e.target === cartBackdrop) closeCart();
     });
+
+    const stickyMobileCartBtn = document.getElementById('stickyMobileCartBtn');
+    const stickyMobileCart = document.getElementById('stickyMobileCart');
+    if (stickyMobileCartBtn) stickyMobileCartBtn.addEventListener('click', openCart);
+    if (stickyMobileCart) {
+      stickyMobileCart.addEventListener('click', (e) => {
+        if (!e.target.closest('button')) openCart();
+      });
+    }
 
     // Quick View Modal Close
     closeQuickViewBtn.addEventListener('click', closeQuickView);
@@ -1036,6 +1072,23 @@
         `;
         })
         .join('');
+    // Sticky Mobile Cart bottom bar sync
+    const stickyCart = document.getElementById('stickyMobileCart');
+    const stickyCartCount = document.getElementById('stickyMobileCartCount');
+    const stickyCartTotal = document.getElementById('stickyMobileCartTotal');
+
+    if (stickyCart && stickyCartCount && stickyCartTotal) {
+      if (totalCount > 0) {
+        stickyCartCount.textContent = `${totalCount} ${totalCount === 1 ? 'item' : 'items'}`;
+        stickyCartTotal.textContent = `₹${subtotal}`;
+        stickyCart.classList.add('active');
+        stickyCart.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('has-sticky-cart');
+      } else {
+        stickyCart.classList.remove('active');
+        stickyCart.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('has-sticky-cart');
+      }
     }
   }
 
@@ -1048,6 +1101,9 @@
     cartBackdrop.classList.remove('open');
     cartBackdrop.setAttribute('aria-hidden', 'true');
   }
+
+  window.openCart = openCart;
+  window.closeCart = closeCart;
 
   // ==========================================
   // WHATSAPP ORDER GENERATOR (Direct Local Order)
