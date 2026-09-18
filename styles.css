@@ -2461,3 +2461,274 @@ img, svg {
   }
 }
 
+/* ==========================================================================
+   UPI QR MODAL & VERIFICATION STYLES
+   ========================================================================== */
+.upi-modal-card {
+  max-width: 540px;
+  padding: 28px 24px;
+}
+
+.upi-modal-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.upi-header-badge {
+  display: inline-block;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.upi-amount-lock-box {
+  background: #FAF7F2;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  text-align: center;
+  margin: 10px 0 14px;
+}
+
+.upi-lock-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+.upi-lock-amount {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  font-family: var(--font-heading);
+  line-height: 1.15;
+  margin: 2px 0;
+}
+
+.upi-lock-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.upi-qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.upi-qr-frame {
+  width: 210px;
+  height: 210px;
+  background: #FFFFFF;
+  border: 2px solid #EFE8DC;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 8px;
+  box-shadow: 0 4px 14px rgba(25, 23, 20, 0.08);
+}
+
+.upi-qr-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
+}
+
+.upi-qr-loading {
+  position: absolute;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 10px;
+}
+
+.upi-vpa-copy-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.upi-vpa-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.upi-vpa-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FAF7F2;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.upi-vpa-code {
+  font-family: monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-main);
+  user-select: all;
+}
+
+.btn-copy-upi {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-copy-upi:hover {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+}
+
+.upi-mobile-intent-wrap {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 4px;
+}
+
+.btn-upi-intent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: #1EBE5D;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 11px 16px;
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  box-shadow: 0 3px 10px rgba(30, 190, 93, 0.25);
+  transition: var(--transition);
+}
+
+.btn-upi-intent:hover {
+  background: #189e4c;
+  transform: translateY(-1px);
+}
+
+.upi-steps-guide {
+  background: #FDFBF8;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.upi-step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-body);
+}
+
+.upi-step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.upi-utr-input {
+  font-family: monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.upi-security-notice {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.78rem;
+  color: #166534;
+  margin-top: 12px;
+  line-height: 1.45;
+}
+
+.security-notice-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.upi-verification-notice {
+  font-size: 0.78rem;
+  margin-top: 8px;
+  line-height: 1.45;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #92400E;
+}
+
+/* Order Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.status-badge.status-pending {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+}
+
+.status-badge.status-paid {
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #86EFAC;
+}
+
+.status-badge.status-cancelled {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FCA5A5;
+}
+

@@ -194,3 +194,166 @@ async function uploadImageToStorage(file, folder = "uploads") {
     reader.readAsDataURL(file);
   });
 }
+
+// ==========================================================================
+// ORDERS MANAGEMENT (FIRESTORE + RESILIENT LOCAL FALLBACK)
+// ==========================================================================
+
+/**
+ * Get all local orders from localStorage
+ */
+function getLocalOrders() {
+  try {
+    const raw = localStorage.getItem('pebble_orders');
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.warn('[Pebble Orders] Failed to read local orders:', err);
+    return [];
+  }
+}
+
+/**
+ * Save all local orders to localStorage
+ */
+function saveLocalOrders(orders) {
+  try {
+    localStorage.setItem('pebble_orders', JSON.stringify(orders));
+  } catch (err) {
+    console.warn('[Pebble Orders] Failed to write local orders:', err);
+  }
+}
+
+/**
+ * Create a new order (Stores to Firestore & local storage with locked amount)
+ */
+async function createCloudOrder(orderData) {
+  // Ensure order has created timestamp
+  const order = {
+    ...orderData,
+    createdAt: orderData.createdAt || new Date().toISOString(),
+    timestamp: Date.now()
+  };
+
+  // 1. Immediately save to local storage (zero latency guard)
+  const localOrders = getLocalOrders();
+  const existingIdx = localOrders.findIndex(o => o.id === order.id);
+  if (existingIdx > -1) {
+    localOrders[existingIdx] = order;
+  } else {
+    localOrders.unshift(order);
+  }
+  saveLocalOrders(localOrders);
+
+  // 2. Persist to Firestore
+  if (isFirebaseConfigured && firestoreDb) {
+    try {
+      await firestoreDb.collection("orders").doc(order.id).set(order, { merge: true });
+      console.log(`[Pebble Firebase] Order ${order.id} saved to Firestore.`);
+    } catch (err) {
+      console.warn("[Pebble Firebase] Could not save order to Firestore:", err.message);
+    }
+  }
+
+  return order;
+}
+
+/**
+ * Update order payment proof / UTR reference (Customer action)
+ * Sets status strictly to PAYMENT_PENDING_VERIFICATION (never auto-PAID)
+ */
+async function updateCloudOrderPaymentProof(orderId, utr, screenshotUrl = '') {
+  const updateData = {
+    utrNumber: String(utr || '').trim(),
+    screenshotUrl: screenshotUrl || '',
+    paymentStatus: 'PAYMENT_PENDING_VERIFICATION',
+    paymentReferenceSubmittedAt: new Date().toISOString()
+  };
+
+  // 1. Update local storage
+  const localOrders = getLocalOrders();
+  const order = localOrders.find(o => o.id === orderId);
+  if (order) {
+    Object.assign(order, updateData);
+    saveLocalOrders(localOrders);
+  }
+
+  // 2. Update Firestore
+  if (isFirebaseConfigured && firestoreDb) {
+    try {
+      await firestoreDb.collection("orders").doc(orderId).set(updateData, { merge: true });
+      console.log(`[Pebble Firebase] Order ${orderId} payment proof updated in Firestore.`);
+    } catch (err) {
+      console.warn("[Pebble Firebase] Error updating payment proof in Firestore:", err.message);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Update order status (Admin only action: e.g. PAID or CANCELLED)
+ */
+async function updateCloudOrderStatus(orderId, newStatus, adminNotes = '') {
+  const updateData = {
+    paymentStatus: newStatus,
+    adminNotes: adminNotes || '',
+    statusUpdatedAt: new Date().toISOString()
+  };
+
+  // 1. Update local storage
+  const localOrders = getLocalOrders();
+  const order = localOrders.find(o => o.id === orderId);
+  if (order) {
+    Object.assign(order, updateData);
+    saveLocalOrders(localOrders);
+  }
+
+  // 2. Update Firestore
+  if (isFirebaseConfigured && firestoreDb) {
+    try {
+      await firestoreDb.collection("orders").doc(orderId).set(updateData, { merge: true });
+      console.log(`[Pebble Firebase] Order ${orderId} status set to "${newStatus}" in Firestore.`);
+    } catch (err) {
+      console.warn("[Pebble Firebase] Error updating order status in Firestore:", err.message);
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Fetch all orders (combines Firestore & local storage, sorted latest first)
+ */
+async function getCloudOrders() {
+  const localOrders = getLocalOrders();
+
+  if (isFirebaseConfigured && firestoreDb) {
+    try {
+      const snapshot = await firestoreDb.collection("orders").orderBy("timestamp", "desc").get();
+      if (!snapshot.empty) {
+        const cloudOrders = [];
+        snapshot.forEach(doc => {
+          cloudOrders.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Merge cloud with local to guarantee zero data loss
+        const mergedMap = new Map();
+        cloudOrders.forEach(o => mergedMap.set(o.id, o));
+        localOrders.forEach(o => {
+          if (!mergedMap.has(o.id)) {
+            mergedMap.set(o.id, o);
+          }
+        });
+
+        const mergedOrders = Array.from(mergedMap.values());
+        saveLocalOrders(mergedOrders);
+        return mergedOrders;
+      }
+    } catch (err) {
+      console.warn("[Pebble Firebase] Could not read orders from Firestore:", err.message);
+    }
+  }
+
+  return localOrders;
+}
+

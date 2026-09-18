@@ -44,6 +44,24 @@
   const closeSuccessBtn = document.getElementById('closeSuccessBtn');
   const orderReceiptDetails = document.getElementById('orderReceiptDetails');
 
+  // UPI Payment Modal Elements
+  const upiPaymentModal = document.getElementById('upiPaymentModal');
+  const closeUpiModalBtn = document.getElementById('closeUpiModalBtn');
+  const cancelUpiPaymentBtn = document.getElementById('cancelUpiPaymentBtn');
+  const submitUpiProofBtn = document.getElementById('submitUpiProofBtn');
+  const copyUpiIdBtn = document.getElementById('copyUpiIdBtn');
+  const upiUtrInput = document.getElementById('upiUtrInput');
+  const upiProofFile = document.getElementById('upiProofFile');
+  const upiQrCodeImg = document.getElementById('upiQrCodeImg');
+  const upiQrLoading = document.getElementById('upiQrLoading');
+  const upiLockedAmount = document.getElementById('upiLockedAmount');
+  const upiDisplayOrderId = document.getElementById('upiDisplayOrderId');
+  const upiMerchantVpa = document.getElementById('upiMerchantVpa');
+  const upiDeepLinkBtn = document.getElementById('upiDeepLinkBtn');
+  const upiStepAmount = document.getElementById('upiStepAmount');
+
+  let currentActiveOrder = null;
+
   const toastContainer = document.getElementById('toastContainer');
 
   // ==========================================
@@ -406,12 +424,56 @@
       successModal.setAttribute('aria-hidden', 'true');
     });
 
+    // UPI Payment Modal Close & Cancel
+    if (closeUpiModalBtn) {
+      closeUpiModalBtn.addEventListener('click', closeUpiPaymentModal);
+    }
+    if (cancelUpiPaymentBtn) {
+      cancelUpiPaymentBtn.addEventListener('click', () => {
+        closeUpiPaymentModal();
+        openCheckoutModal();
+      });
+    }
+    if (upiPaymentModal) {
+      upiPaymentModal.addEventListener('click', (e) => {
+        if (e.target === upiPaymentModal) closeUpiPaymentModal();
+      });
+    }
+
+    // 1-Click Copy Merchant UPI ID
+    if (copyUpiIdBtn) {
+      copyUpiIdBtn.addEventListener('click', () => {
+        const vpa = (upiMerchantVpa ? upiMerchantVpa.textContent : '').trim();
+        if (!vpa) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(vpa).then(() => {
+            const btnText = document.getElementById('copyUpiBtnText');
+            if (btnText) btnText.textContent = '✓ Copied!';
+            showToast('UPI ID copied to clipboard!');
+            setTimeout(() => {
+              if (btnText) btnText.textContent = '📋 Copy';
+            }, 2500);
+          }).catch(() => {
+            prompt('Copy UPI ID:', vpa);
+          });
+        } else {
+          prompt('Copy UPI ID:', vpa);
+        }
+      });
+    }
+
+    // Submit UPI Reference (UTR)
+    if (submitUpiProofBtn) {
+      submitUpiProofBtn.addEventListener('click', handleUpiReferenceSubmit);
+    }
+
     // Keyboard navigation & Discrete Admin Shortcut (Ctrl + Shift + A)
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeQuickView();
         closeCart();
         closeCheckoutModal();
+        closeUpiPaymentModal();
         successModal.classList.remove('open');
       } else if (e.shiftKey && (e.ctrlKey || e.metaKey) && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
@@ -1214,6 +1276,9 @@
   // ==========================================
   function openCheckoutModal() {
     const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const threshold = siteConfig.freeShippingThreshold || 799;
+    const shippingFee = subtotal >= threshold ? 0 : (siteConfig.shippingCharge || 50);
+    const grandTotal = subtotal + shippingFee;
 
     checkoutMiniSummary.innerHTML = `
       <div style="font-weight: 700; margin-bottom: 8px; color: var(--color-text-main);">
@@ -1229,9 +1294,19 @@
       `
         )
         .join('')}
-      <div class="item-line" style="border-top: 1px dashed var(--color-border); margin-top: 8px; padding-top: 8px; font-weight: 700;">
+      <div class="item-line" style="border-top: 1px dashed var(--color-border); margin-top: 8px; padding-top: 6px; font-size: 0.85rem; color: var(--color-text-muted);">
+        <span>Subtotal:</span>
+        <span>₹${subtotal}</span>
+      </div>
+      <div class="item-line" style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 4px;">
+        <span>Local Delivery:</span>
+        <span style="color: ${shippingFee === 0 ? '#1EBE5D' : 'inherit'}; font-weight: 600;">
+          ${shippingFee === 0 ? 'FREE' : `₹${shippingFee}`}
+        </span>
+      </div>
+      <div class="item-line" style="border-top: 1px dashed var(--color-border); padding-top: 8px; font-weight: 700;">
         <span>Total Payable:</span>
-        <span style="color: var(--color-primary); font-size: 1.1rem;">₹${subtotal}</span>
+        <span style="color: var(--color-primary); font-size: 1.15rem;">₹${grandTotal}</span>
       </div>
     `;
 
@@ -1244,25 +1319,239 @@
     checkoutModal.setAttribute('aria-hidden', 'true');
   }
 
-  function processDirectOrder(details) {
-    const orderId = 'PEB-' + Math.floor(100000 + Math.random() * 900000);
-    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  function openUpiPaymentModal(order) {
+    if (!order) return;
+    currentActiveOrder = order;
 
-    orderReceiptDetails.innerHTML = `
-      <div style="margin-bottom: 6px;"><strong>Order ID:</strong> ${orderId}</div>
-      <div style="margin-bottom: 6px;"><strong>Customer:</strong> ${escapeHtml(details.name)} (${escapeHtml(details.phone)})</div>
-      <div style="margin-bottom: 6px;"><strong>Delivery To:</strong> ${escapeHtml(details.address)}</div>
-      <div style="margin-bottom: 6px;"><strong>Payment Method:</strong> ${escapeHtml(details.payMethod)}</div>
-      <div style="margin-bottom: 6px;"><strong>Items:</strong> ${cart.map((c) => `${c.quantity}x ${c.designName} (${c.pages}p)`).join(', ')}</div>
-      <div style="margin-top: 8px; font-size: 1.05rem; font-weight: 700; color: var(--color-primary);">Total Amount: ₹${subtotal}</div>
-    `;
+    // Display locked amount & Order ID
+    if (upiLockedAmount) upiLockedAmount.textContent = `₹${order.finalAmount}`;
+    if (upiStepAmount) upiStepAmount.textContent = `₹${order.finalAmount}`;
+    if (upiDisplayOrderId) upiDisplayOrderId.textContent = order.id;
 
-    closeCheckoutModal();
+    // Retrieve Merchant UPI ID
+    const merchantVpa = (siteConfig.merchantUpiId || 'pebbleee17@gmail.com').trim();
+    const merchantName = (siteConfig.merchantUpiName || siteConfig.brandName || 'Pebble Books').trim();
+    if (upiMerchantVpa) upiMerchantVpa.textContent = merchantVpa;
 
-    // Clear Cart
+    // Build standard native UPI Deep-Link URI
+    const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${order.finalAmount}&cu=INR&tn=${encodeURIComponent('Pebble Order ' + order.id)}`;
+
+    // Set mobile intent button link
+    if (upiDeepLinkBtn) {
+      upiDeepLinkBtn.href = upiUri;
+    }
+
+    // Dynamic QR Code generation with fallback
+    if (upiQrCodeImg && upiQrLoading) {
+      upiQrLoading.style.display = 'block';
+      upiQrCodeImg.style.display = 'none';
+
+      const primaryQr = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(upiUri)}`;
+      upiQrCodeImg.onload = () => {
+        upiQrLoading.style.display = 'none';
+        upiQrCodeImg.style.display = 'block';
+      };
+      upiQrCodeImg.onerror = () => {
+        upiQrCodeImg.src = `https://quickchart.io/qr?size=240&text=${encodeURIComponent(upiUri)}`;
+        upiQrLoading.style.display = 'none';
+        upiQrCodeImg.style.display = 'block';
+      };
+      upiQrCodeImg.src = primaryQr;
+    }
+
+    // Clear inputs
+    if (upiUtrInput) upiUtrInput.value = '';
+    if (upiProofFile) upiProofFile.value = '';
+
+    upiPaymentModal.classList.add('open');
+    upiPaymentModal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeUpiPaymentModal() {
+    if (upiPaymentModal) {
+      upiPaymentModal.classList.remove('open');
+      upiPaymentModal.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  async function handleUpiReferenceSubmit() {
+    if (!currentActiveOrder) {
+      showToast('⚠️ No active order session found. Please place order again.');
+      closeUpiPaymentModal();
+      return;
+    }
+
+    const utr = (upiUtrInput ? upiUtrInput.value : '').trim();
+    if (!/^\d{12}$/.test(utr)) {
+      showToast('⚠️ Please enter a valid 12-digit UPI reference / UTR number.');
+      if (upiUtrInput) upiUtrInput.focus();
+      return;
+    }
+
+    if (submitUpiProofBtn) {
+      submitUpiProofBtn.disabled = true;
+      submitUpiProofBtn.textContent = 'Submitting Reference...';
+    }
+
+    // Optional payment screenshot upload (for admin reference only)
+    let screenshotUrl = '';
+    if (upiProofFile && upiProofFile.files && upiProofFile.files[0]) {
+      try {
+        if (typeof uploadImageToStorage === 'function') {
+          screenshotUrl = await uploadImageToStorage(upiProofFile.files[0], 'proofs');
+        }
+      } catch (err) {
+        console.warn('[Pebble] Screenshot upload warning:', err);
+      }
+    }
+
+    // Update cloud order payment proof (Status strictly set to PAYMENT_PENDING_VERIFICATION)
+    currentActiveOrder.paymentStatus = 'PAYMENT_PENDING_VERIFICATION';
+    currentActiveOrder.utrNumber = utr;
+    currentActiveOrder.screenshotUrl = screenshotUrl;
+    if (typeof updateCloudOrderPaymentProof === 'function') {
+      await updateCloudOrderPaymentProof(currentActiveOrder.id, utr, screenshotUrl);
+    }
+
+    // ANTI-DUPLICATE GUARDS:
+    // 1. Immediately clear the customer shopping cart so page refresh cannot duplicate order
     cart = [];
     saveCartToStorage();
     updateCartUI();
+
+    // 2. Save last order ID to sessionStorage
+    try {
+      sessionStorage.setItem('pebble_last_order_id', currentActiveOrder.id);
+    } catch (e) {}
+
+    // Close payment modal
+    closeUpiPaymentModal();
+
+    // Construct WhatsApp notification link so customer can also optionally message Pebble
+    const waNumber = siteConfig.whatsappNumber || '919876543210';
+    const waMsgText = encodeURIComponent(
+      `*PEBBLE ORDER PAYMENT REFERENCE SUBMITTED* 📚✨\n` +
+      `Hello Pebble! I have completed payment for my order.\n\n` +
+      `• *Order ID:* ${currentActiveOrder.id}\n` +
+      `• *Amount Paid:* ₹${currentActiveOrder.finalAmount}\n` +
+      `• *12-Digit UTR:* ${utr}\n` +
+      `• *Customer:* ${currentActiveOrder.customerName} (${currentActiveOrder.phone})\n\n` +
+      `Please verify the bank credit and confirm dispatch. Thank you!`
+    );
+    const waShareUrl = `https://wa.me/${waNumber}?text=${waMsgText}`;
+
+    // Render receipt details with Pending Verification status badge
+    orderReceiptDetails.innerHTML = `
+      <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+        <span style="font-size: 0.95rem;"><strong>Order ID:</strong> <code style="font-family: monospace; font-size: 1rem;">${currentActiveOrder.id}</code></span>
+        <span class="status-badge status-pending">Pending Verification</span>
+      </div>
+      <div style="margin-bottom: 6px;"><strong>Customer:</strong> ${escapeHtml(currentActiveOrder.customerName)} (${escapeHtml(currentActiveOrder.phone)})</div>
+      <div style="margin-bottom: 6px;"><strong>Delivery To:</strong> ${escapeHtml(currentActiveOrder.address)}</div>
+      <div style="margin-bottom: 6px;"><strong>Payment Method:</strong> ${escapeHtml(currentActiveOrder.paymentMethod)}</div>
+      <div style="margin-bottom: 6px;"><strong>Submitted UTR:</strong> <code style="font-family: monospace; font-weight: 700; background: #EFE8DC; padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;">${escapeHtml(utr)}</code></div>
+      <div style="margin-bottom: 6px;"><strong>Items:</strong> ${currentActiveOrder.items.map((c) => `${c.quantity}× ${escapeHtml(c.designName)} (${c.pages}p)`).join(', ')}</div>
+      <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--color-border); font-size: 1.05rem; font-weight: 700; color: var(--color-primary); display: flex; justify-content: space-between;">
+        <span>Total Amount (Locked):</span>
+        <span>₹${currentActiveOrder.finalAmount}</span>
+      </div>
+      <div style="margin-top: 14px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; color: #92400E; line-height: 1.45;">
+        ℹ️ <strong>Pending Admin Verification:</strong> We have recorded your UTR reference. Our studio will verify the credit against our bank account and dispatch your handcrafted books!
+      </div>
+      <a href="${waShareUrl}" target="_blank" rel="noopener noreferrer" class="btn-whatsapp-checkout" style="margin-top: 14px; text-decoration: none; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.981.536 1.761.814 2.796.814 3.178 0 5.766-2.587 5.767-5.766.002-3.18-2.585-5.766-5.767-5.766zm3.385 8.163c-.14.394-.712.729-1.002.776-.28.046-.642.067-1.036-.059-.283-.09-.643-.223-1.121-.43-1.921-.83-3.171-2.779-3.267-2.909-.095-.129-.785-1.042-.785-1.987 0-.946.496-1.411.672-1.605.176-.194.385-.243.513-.243.129 0 .257.002.37.008.12.006.279-.046.438.334.16.381.546 1.332.594 1.43.048.098.08.212.016.34-.064.129-.096.21-.192.323-.096.113-.203.253-.29.34-.097.097-.198.203-.086.395.113.193.501.826 1.074 1.337.738.657 1.36.861 1.554.957.193.097.306.081.419-.048.113-.129.483-.563.611-.756.129-.193.258-.161.435-.096.177.064 1.124.53 1.317.627.193.097.322.145.37.225.048.08.048.467-.092.861z"/>
+        </svg>
+        Share Order Details on WhatsApp
+      </a>
+    `;
+
+    // Open Success Modal
+    successModal.classList.add('open');
+    successModal.setAttribute('aria-hidden', 'false');
+    showToast('✅ Payment reference submitted!');
+
+    if (submitUpiProofBtn) {
+      submitUpiProofBtn.disabled = false;
+      submitUpiProofBtn.textContent = 'I Have Paid — Submit Reference';
+    }
+  }
+
+  async function processDirectOrder(details) {
+    if (cart.length === 0) {
+      showToast('Your bag is empty.');
+      return;
+    }
+
+    const orderId = 'PEB-' + Math.floor(100000 + Math.random() * 900000);
+    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const threshold = siteConfig.freeShippingThreshold || 799;
+    const shippingFee = subtotal >= threshold ? 0 : (siteConfig.shippingCharge || 50);
+    const finalAmount = subtotal + shippingFee; // LOCKED & IMMUTABLE
+
+    const orderData = {
+      id: orderId,
+      customerName: details.name,
+      phone: details.phone,
+      address: details.address,
+      notes: details.notes || '',
+      items: cart.map((c) => ({
+        id: c.id,
+        title: c.title,
+        designName: c.designName,
+        pages: c.pages,
+        price: c.price,
+        quantity: c.quantity,
+        customImageUrl: c.customImageUrl || ''
+      })),
+      subtotal: subtotal,
+      shippingFee: shippingFee,
+      finalAmount: finalAmount, // LOCKED & IMMUTABLE
+      paymentMethod: details.payMethod,
+      createdAt: new Date().toISOString(),
+      timestamp: Date.now()
+    };
+
+    const isUpi = details.payMethod && (details.payMethod.includes('UPI') || details.payMethod.includes('QR'));
+
+    if (isUpi) {
+      orderData.paymentStatus = 'PAYMENT_PENDING_DETAILS';
+      if (typeof createCloudOrder === 'function') {
+        await createCloudOrder(orderData);
+      }
+      closeCheckoutModal();
+      openUpiPaymentModal(orderData);
+      return;
+    }
+
+    // Cash on Delivery / Card on Delivery
+    orderData.paymentStatus = 'COD_PENDING';
+    if (typeof createCloudOrder === 'function') {
+      await createCloudOrder(orderData);
+    }
+
+    closeCheckoutModal();
+
+    // Clear Cart immediately to prevent duplicate orders
+    cart = [];
+    saveCartToStorage();
+    updateCartUI();
+
+    // Render receipt
+    orderReceiptDetails.innerHTML = `
+      <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <span><strong>Order ID:</strong> <code style="font-family: monospace; font-size: 1rem;">${orderId}</code></span>
+        <span class="status-badge status-pending">COD - Payment on Delivery</span>
+      </div>
+      <div style="margin-bottom: 6px;"><strong>Customer:</strong> ${escapeHtml(details.name)} (${escapeHtml(details.phone)})</div>
+      <div style="margin-bottom: 6px;"><strong>Delivery To:</strong> ${escapeHtml(details.address)}</div>
+      <div style="margin-bottom: 6px;"><strong>Payment Method:</strong> ${escapeHtml(details.payMethod)}</div>
+      <div style="margin-bottom: 6px;"><strong>Items:</strong> ${orderData.items.map((c) => `${c.quantity}× ${escapeHtml(c.designName)} (${c.pages}p)`).join(', ')}</div>
+      <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--color-border); font-size: 1.05rem; font-weight: 700; color: var(--color-primary); display: flex; justify-content: space-between;">
+        <span>Total Amount (Locked):</span>
+        <span>₹${finalAmount}</span>
+      </div>
+    `;
 
     // Open Success Modal
     successModal.classList.add('open');

@@ -109,6 +109,24 @@
   const waNumberInput = document.getElementById('waNumberInput');
   const waNavRedirectInput = document.getElementById('waNavRedirectInput');
   const waFooterRedirectInput = document.getElementById('waFooterRedirectInput');
+  const merchantUpiInput = document.getElementById('merchantUpiInput');
+  const merchantUpiNameInput = document.getElementById('merchantUpiNameInput');
+
+  // DOM Elements - Orders Management
+  const ordersCountBadge = document.getElementById('ordersCountBadge');
+  const refreshOrdersBtn = document.getElementById('refreshOrdersBtn');
+  const adminOrderSearch = document.getElementById('adminOrderSearch');
+  const adminOrdersTableBody = document.getElementById('adminOrdersTableBody');
+  const proofViewModal = document.getElementById('proofViewModal');
+  const proofModalImg = document.getElementById('proofModalImg');
+  const proofModalTitle = document.getElementById('proofModalTitle');
+  const proofDownloadLink = document.getElementById('proofDownloadLink');
+  const closeProofModalBtn = document.getElementById('closeProofModalBtn');
+  const closeProofModalBtn2 = document.getElementById('closeProofModalBtn2');
+
+  let ordersList = [];
+  let orderStatusFilter = 'all';
+  let orderSearchTerm = '';
 
   // DOM Elements - Settings
   const freeShippingThresholdInput = document.getElementById('freeShippingThresholdInput');
@@ -365,6 +383,7 @@
     await loadData();
     populateFormValues();
     renderProductsTable();
+    await loadOrders();
     setupEventListeners();
     updateFirebaseStatusUI();
   }
@@ -508,6 +527,10 @@
     waNumberInput.value = siteConfig.whatsappNumber || '';
     waNavRedirectInput.value = siteConfig.whatsappNavRedirectText || '';
     waFooterRedirectInput.value = siteConfig.whatsappFooterRedirectText || '';
+
+    // UPI Payment Settings
+    if (merchantUpiInput) merchantUpiInput.value = siteConfig.merchantUpiId || 'pebbleee17@gmail.com';
+    if (merchantUpiNameInput) merchantUpiNameInput.value = siteConfig.merchantUpiName || 'Pebble Books';
 
     // Settings
     freeShippingThresholdInput.value = siteConfig.freeShippingThreshold || 799;
@@ -1044,6 +1067,49 @@
     // Product Form Submit
     productEditForm.addEventListener('submit', handleProductFormSubmit);
 
+    // Orders Management Listeners
+    if (refreshOrdersBtn) {
+      refreshOrdersBtn.addEventListener('click', async () => {
+        showToast('Refreshing orders from cloud...');
+        await loadOrders();
+        showToast('Orders refreshed!');
+      });
+    }
+
+    const orderFilterChips = document.querySelectorAll('.order-stat-chip');
+    orderFilterChips.forEach((chip) => {
+      chip.addEventListener('click', () => {
+        orderFilterChips.forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        orderStatusFilter = chip.dataset.status || 'all';
+        renderOrdersTable();
+      });
+    });
+
+    if (adminOrderSearch) {
+      adminOrderSearch.addEventListener('input', (e) => {
+        orderSearchTerm = e.target.value.trim().toLowerCase();
+        renderOrdersTable();
+      });
+    }
+
+    // Proof Modal Handlers
+    if (closeProofModalBtn) closeProofModalBtn.addEventListener('click', closeProofModal);
+    if (closeProofModalBtn2) closeProofModalBtn2.addEventListener('click', closeProofModal);
+    if (proofViewModal) {
+      proofViewModal.addEventListener('click', (e) => {
+        if (e.target === proofViewModal) closeProofModal();
+      });
+    }
+
+    // Keyboard navigation Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeProductModal();
+        closeProofModal();
+      }
+    });
+
     // Backup & Restore
     exportBackupBtn.addEventListener('click', exportStoreBackup);
     importBackupInput.addEventListener('change', importStoreBackup);
@@ -1094,6 +1160,9 @@
       whatsappNumber: waNumberInput.value.trim().replace(/\D/g, ''),
       whatsappNavRedirectText: waNavRedirectInput.value.trim(),
       whatsappFooterRedirectText: waFooterRedirectInput.value.trim(),
+
+      merchantUpiId: merchantUpiInput ? merchantUpiInput.value.trim() : (siteConfig.merchantUpiId || 'pebbleee17@gmail.com'),
+      merchantUpiName: merchantUpiNameInput ? merchantUpiNameInput.value.trim() : (siteConfig.merchantUpiName || 'Pebble Books'),
 
       freeShippingThreshold: Number(freeShippingThresholdInput.value) || 799,
       shippingCharge: Number(shippingChargeInput.value) || 50
@@ -1395,8 +1464,296 @@
   }
 
   // ==========================================================================
-  // TOAST UTILITY
+  // ORDERS MANAGEMENT & MANUAL PAYMENT VERIFICATION
   // ==========================================================================
+  async function loadOrders() {
+    if (typeof getCloudOrders === 'function') {
+      try {
+        ordersList = await getCloudOrders();
+      } catch (err) {
+        console.warn('[Pebble Admin] Error loading orders from cloud:', err);
+        ordersList = typeof getLocalOrders === 'function' ? getLocalOrders() : [];
+      }
+    } else if (typeof getLocalOrders === 'function') {
+      ordersList = getLocalOrders();
+    }
+    updateOrdersStatsUI();
+    renderOrdersTable();
+  }
+
+  function updateOrdersStatsUI() {
+    const allCount = ordersList.length;
+    const pendingCount = ordersList.filter(
+      (o) => o.paymentStatus === 'PAYMENT_PENDING_VERIFICATION' || o.paymentStatus === 'PAYMENT_PENDING_DETAILS' || o.paymentStatus === 'COD_PENDING'
+    ).length;
+    const paidCount = ordersList.filter((o) => o.paymentStatus === 'PAID').length;
+    const cancelledCount = ordersList.filter((o) => o.paymentStatus === 'CANCELLED').length;
+
+    const statAll = document.getElementById('statAllCount');
+    const statPending = document.getElementById('statPendingCount');
+    const statPaid = document.getElementById('statPaidCount');
+    const statCancelled = document.getElementById('statCancelledCount');
+
+    if (statAll) statAll.textContent = allCount;
+    if (statPending) statPending.textContent = pendingCount;
+    if (statPaid) statPaid.textContent = paidCount;
+    if (statCancelled) statCancelled.textContent = cancelledCount;
+
+    if (ordersCountBadge) {
+      if (pendingCount > 0) {
+        ordersCountBadge.textContent = pendingCount;
+        ordersCountBadge.style.display = 'inline-block';
+      } else {
+        ordersCountBadge.style.display = 'none';
+      }
+    }
+  }
+
+  function renderOrdersTable() {
+    if (!adminOrdersTableBody) return;
+
+    let filtered = ordersList;
+
+    // Filter by status chip
+    if (orderStatusFilter === 'pending') {
+      filtered = filtered.filter(
+        (o) => o.paymentStatus === 'PAYMENT_PENDING_VERIFICATION' || o.paymentStatus === 'PAYMENT_PENDING_DETAILS' || o.paymentStatus === 'COD_PENDING'
+      );
+    } else if (orderStatusFilter === 'paid') {
+      filtered = filtered.filter((o) => o.paymentStatus === 'PAID');
+    } else if (orderStatusFilter === 'cancelled') {
+      filtered = filtered.filter((o) => o.paymentStatus === 'CANCELLED');
+    }
+
+    // Filter by search query
+    if (orderSearchTerm) {
+      filtered = filtered.filter((o) => {
+        const idMatch = (o.id || '').toLowerCase().includes(orderSearchTerm);
+        const nameMatch = (o.customerName || '').toLowerCase().includes(orderSearchTerm);
+        const phoneMatch = (o.phone || '').toLowerCase().includes(orderSearchTerm);
+        const addrMatch = (o.address || '').toLowerCase().includes(orderSearchTerm);
+        const utrMatch = (o.utrNumber || '').toLowerCase().includes(orderSearchTerm);
+        return idMatch || nameMatch || phoneMatch || addrMatch || utrMatch;
+      });
+    }
+
+    if (filtered.length === 0) {
+      adminOrdersTableBody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 42px 16px; color: var(--text-muted);">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">📦</div>
+            <strong style="font-size: 1rem; color: var(--text-main);">No orders found matching filter</strong>
+            <p style="font-size: 0.82rem; margin-top: 4px;">Orders placed on the website will be displayed here in real time.</p>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    adminOrdersTableBody.innerHTML = filtered
+      .map((order) => {
+        const dateStr = order.createdAt
+          ? new Date(order.createdAt).toLocaleString('en-IN', {
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            })
+          : '—';
+
+        // Status badge
+        let statusHtml = '';
+        if (order.paymentStatus === 'PAID') {
+          statusHtml = `<span class="order-badge-paid">✓ Verified &amp; Paid</span>`;
+        } else if (order.paymentStatus === 'CANCELLED') {
+          statusHtml = `<span class="order-badge-cancelled">✕ Cancelled</span>`;
+        } else if (order.paymentStatus === 'COD_PENDING') {
+          statusHtml = `<span class="order-badge-pending">COD (Pending Dispatch)</span>`;
+        } else {
+          statusHtml = `<span class="order-badge-pending">⏳ Pending Verification</span>`;
+        }
+
+        // WhatsApp direct link
+        const cleanPhone = (order.phone || '').replace(/\D/g, '');
+        const waLink = cleanPhone
+          ? `https://wa.me/${cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone}`
+          : '#';
+
+        // Items breakdown
+        const itemsHtml = Array.isArray(order.items)
+          ? order.items
+              .map(
+                (item) => `
+            <div class="order-item-line">
+              <span class="order-item-qty">${item.quantity}×</span>
+              <span>${escapeHtml(item.designName || item.title)}</span>
+              <span style="font-size: 0.74rem; color: var(--text-muted);">(${item.pages}p)</span>
+            </div>
+          `
+              )
+              .join('')
+          : '—';
+
+        // Proof preview
+        let proofHtml = '<span style="color: var(--text-muted); font-size: 0.76rem;">None</span>';
+        if (order.screenshotUrl) {
+          proofHtml = `
+            <img 
+              src="${escapeHtml(order.screenshotUrl)}" 
+              alt="Proof" 
+              class="proof-thumb-preview" 
+              onclick="window.viewOrderProof('${escapeHtml(order.screenshotUrl)}', '${escapeHtml(order.id)}')" 
+              title="Click to enlarge proof screenshot"
+            >
+          `;
+        }
+
+        // Action Buttons
+        let actionButtons = '';
+        if (order.paymentStatus === 'PAID') {
+          actionButtons = `
+            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+              <button type="button" class="btn-order-cancel" onclick="window.cancelOrderAdmin('${escapeHtml(order.id)}')">
+                ✕ Cancel
+              </button>
+            </div>
+          `;
+        } else if (order.paymentStatus === 'CANCELLED') {
+          actionButtons = `
+            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+              <button type="button" class="btn-admin-subtle" style="font-size: 0.75rem;" onclick="window.reopenOrderAdmin('${escapeHtml(order.id)}')">
+                Re-open
+              </button>
+            </div>
+          `;
+        } else {
+          // Pending Verification / COD
+          actionButtons = `
+            <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
+              <button type="button" class="btn-order-verify" onclick="window.verifyOrderAdmin('${escapeHtml(order.id)}', ${order.finalAmount || order.subtotal || 0}, '${escapeHtml(order.utrNumber || '')}')" title="Verify bank credit and mark as PAID">
+                ✓ Mark as Paid
+              </button>
+              <button type="button" class="btn-order-cancel" onclick="window.cancelOrderAdmin('${escapeHtml(order.id)}')">
+                ✕ Cancel
+              </button>
+            </div>
+          `;
+        }
+
+        return `
+          <tr>
+            <td class="order-id-cell">
+              <code>${escapeHtml(order.id)}</code>
+              <div class="order-date-text">${dateStr}</div>
+            </td>
+            <td>
+              <div class="order-cust-name">${escapeHtml(order.customerName)}</div>
+              <div class="order-cust-phone">
+                <a href="${waLink}" target="_blank" rel="noopener noreferrer" style="color: #1EBE5D; text-decoration: none; font-weight: 600;" title="Message customer on WhatsApp">
+                  💬 ${escapeHtml(order.phone)}
+                </a>
+              </div>
+              <div class="order-cust-addr">${escapeHtml(order.address)}</div>
+              ${order.notes ? `<div class="order-notes-pill">Note: ${escapeHtml(order.notes)}</div>` : ''}
+            </td>
+            <td>
+              ${itemsHtml}
+            </td>
+            <td>
+              <div class="order-amount-display">₹${order.finalAmount || order.subtotal || 0}</div>
+              ${order.shippingFee ? `<div style="font-size:0.72rem; color:var(--text-muted);">+₹${order.shippingFee} Deliv</div>` : '<div style="font-size:0.72rem; color:#1EBE5D;">Free Deliv</div>'}
+            </td>
+            <td>
+              <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-main);">${escapeHtml(order.paymentMethod || 'UPI / QR')}</div>
+              ${order.utrNumber ? `<span class="order-utr-badge" title="12-digit UTR submitted by customer">UTR: ${escapeHtml(order.utrNumber)}</span>` : '<span style="font-size:0.75rem; color:var(--text-muted);">(No UTR submitted)</span>'}
+            </td>
+            <td>
+              ${proofHtml}
+            </td>
+            <td>
+              ${statusHtml}
+            </td>
+            <td>
+              ${actionButtons}
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+  }
+
+  // Admin Verification Actions
+  window.verifyOrderAdmin = async function (orderId, amount, utr) {
+    const promptMsg =
+      `Are you sure you want to mark Order ${orderId} as PAID?\n\n` +
+      `• Order Amount: ₹${amount}\n` +
+      `• Customer Submitted UTR: ${utr || 'None'}\n\n` +
+      `⚠️ IMPORTANT: Please confirm that you have checked your bank/UPI statement and verified credit for this exact amount.`;
+
+    if (!confirm(promptMsg)) return;
+
+    try {
+      showToast(`Verifying Order ${orderId}...`);
+      if (typeof updateCloudOrderStatus === 'function') {
+        await updateCloudOrderStatus(orderId, 'PAID', 'Verified by Admin');
+      }
+      await loadOrders();
+      showToast(`✅ Order ${orderId} verified and marked as PAID!`);
+    } catch (err) {
+      showToast('Error updating order: ' + err.message);
+    }
+  };
+
+  window.cancelOrderAdmin = async function (orderId) {
+    const reason = prompt(
+      `Cancel / Reject Order ${orderId}?\nEnter an optional cancellation note:`,
+      'Payment not received / cancelled by admin'
+    );
+    if (reason === null) return;
+
+    try {
+      showToast(`Cancelling Order ${orderId}...`);
+      if (typeof updateCloudOrderStatus === 'function') {
+        await updateCloudOrderStatus(orderId, 'CANCELLED', reason);
+      }
+      await loadOrders();
+      showToast(`Order ${orderId} cancelled.`);
+    } catch (err) {
+      showToast('Error cancelling order: ' + err.message);
+    }
+  };
+
+  window.reopenOrderAdmin = async function (orderId) {
+    if (!confirm(`Re-open Order ${orderId} as Pending Verification?`)) return;
+
+    try {
+      if (typeof updateCloudOrderStatus === 'function') {
+        await updateCloudOrderStatus(orderId, 'PAYMENT_PENDING_VERIFICATION', 'Re-opened by Admin');
+      }
+      await loadOrders();
+      showToast(`Order ${orderId} re-opened.`);
+    } catch (err) {
+      showToast('Error re-opening order: ' + err.message);
+    }
+  };
+
+  window.viewOrderProof = function (imgUrl, orderId) {
+    if (!proofViewModal || !proofModalImg) return;
+    proofModalImg.src = imgUrl;
+    if (proofModalTitle) proofModalTitle.textContent = `Payment Proof — ${orderId}`;
+    if (proofDownloadLink) proofDownloadLink.href = imgUrl;
+    proofViewModal.classList.add('open');
+    proofViewModal.setAttribute('aria-hidden', 'false');
+  };
+
+  function closeProofModal() {
+    if (proofViewModal) {
+      proofViewModal.classList.remove('open');
+      proofViewModal.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  // ==========================================
+  // TOAST UTILITY
+  // ==========================================
   function showToast(message) {
     const toast = document.createElement('div');
     toast.className = 'admin-toast';

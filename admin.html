@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pebble — Store Admin Panel &amp; CMS</title>
   <meta name="description" content="Manage your Pebble bookstore website, customize logo, edit all texts, contact links, and manage products.">
-  <link rel="stylesheet" href="admin.css?v=1.0.4">
+  <link rel="stylesheet" href="admin.css?v=1.0.5">
 </head>
 <body>
 
@@ -173,6 +173,11 @@
           <span class="nav-tab-icon">📚</span>
           <span>Products (Books)</span>
           <span class="nav-badge" id="productCountBadge">9</span>
+        </button>
+        <button class="nav-tab-btn" data-tab="ordersTab">
+          <span class="nav-tab-icon">📦</span>
+          <span>Orders</span>
+          <span class="nav-badge nav-badge-pending" id="ordersCountBadge" style="display: none; background: #C86446; color: #fff;">0</span>
         </button>
         <button class="nav-tab-btn" data-tab="settingsTab">
           <span class="nav-tab-icon">⚙️</span>
@@ -502,6 +507,29 @@
             </div>
           </div>
         </div>
+
+        <!-- UPI Payment & VPA Configuration -->
+        <div class="admin-card">
+          <div class="card-header-icon-row">
+            <div class="channel-icon-circle" style="background: #EBF8F2; color: #1EBE5D; font-size: 1.2rem;">⚡</div>
+            <div>
+              <h3 class="card-title" style="margin-bottom: 2px;">UPI Payment &amp; QR Settings</h3>
+              <p class="field-hint">Customers scanning the dynamic UPI QR code or tapping the UPI pay button will send payments to this UPI Virtual Payment Address (VPA).</p>
+            </div>
+          </div>
+          <div class="admin-grid-2">
+            <div class="form-group">
+              <label for="merchantUpiInput">Merchant UPI ID / VPA *</label>
+              <input type="text" id="merchantUpiInput" class="admin-input" value="pebbleee17@gmail.com" placeholder="e.g. pebbleee17@gmail.com or 9876543210@upi" required>
+              <span class="field-hint">Your Gmail UPI VPA, phone number VPA (e.g. 9876543210@paytm), or bank handle.</span>
+            </div>
+            <div class="form-group">
+              <label for="merchantUpiNameInput">Merchant Display Name</label>
+              <input type="text" id="merchantUpiNameInput" class="admin-input" value="Pebble Books" placeholder="e.g. Pebble Books">
+              <span class="field-hint">Shown in customer's UPI app payment confirmation screen.</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ==================================================================
@@ -560,7 +588,68 @@
       </section>
 
       <!-- ==================================================================
-           TAB 5: SETTINGS, BACKUP & RESET
+           TAB 5: ORDERS & PAYMENT VERIFICATION
+           ================================================================== -->
+      <section class="admin-tab-pane" id="ordersTab">
+        <div class="pane-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <h2>Store Orders &amp; UPI Verification</h2>
+            <p>Review customer orders, verify 12-digit UTR references against bank credits, and mark orders as Paid or Cancelled.</p>
+          </div>
+          <button type="button" id="refreshOrdersBtn" class="btn-admin-secondary">
+            🔄 Refresh Orders
+          </button>
+        </div>
+
+        <!-- Orders Stats / Quick Filter Chips -->
+        <div class="order-stats-grid">
+          <div class="order-stat-chip active" data-status="all" id="filterAllOrders">
+            <span class="stat-chip-label">All Orders</span>
+            <span class="stat-chip-val" id="statAllCount">0</span>
+          </div>
+          <div class="order-stat-chip" data-status="pending" id="filterPendingOrders" style="border-left-color: #D97706;">
+            <span class="stat-chip-label">Pending Verification</span>
+            <span class="stat-chip-val" id="statPendingCount" style="color: #D97706;">0</span>
+          </div>
+          <div class="order-stat-chip" data-status="paid" id="filterPaidOrders" style="border-left-color: #16A34A;">
+            <span class="stat-chip-label">Verified &amp; Paid</span>
+            <span class="stat-chip-val" id="statPaidCount" style="color: #16A34A;">0</span>
+          </div>
+          <div class="order-stat-chip" data-status="cancelled" id="filterCancelledOrders" style="border-left-color: #DC2626;">
+            <span class="stat-chip-label">Cancelled / Rejected</span>
+            <span class="stat-chip-val" id="statCancelledCount" style="color: #DC2626;">0</span>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="admin-card" style="padding: 16px 20px; margin-top: 14px;">
+          <input type="text" id="adminOrderSearch" class="admin-input" placeholder="🔍 Search orders by Order ID, customer name, phone, address, or 12-digit UTR...">
+        </div>
+
+        <!-- Orders Table -->
+        <div class="admin-card" style="padding: 0; overflow-x: auto; margin-top: 14px;">
+          <table class="admin-table orders-table">
+            <thead>
+              <tr>
+                <th style="min-width: 140px;">Order ID &amp; Date</th>
+                <th style="min-width: 170px;">Customer Details</th>
+                <th style="min-width: 190px;">Items Ordered</th>
+                <th style="min-width: 90px;">Total (₹)</th>
+                <th style="min-width: 170px;">Payment &amp; UTR</th>
+                <th style="min-width: 80px;">Proof</th>
+                <th style="min-width: 130px;">Status</th>
+                <th style="min-width: 180px; text-align: right;">Admin Action</th>
+              </tr>
+            </thead>
+            <tbody id="adminOrdersTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==================================================================
+           TAB 6: SETTINGS, BACKUP & RESET
            ================================================================== -->
       <section class="admin-tab-pane" id="settingsTab">
         <div class="pane-header">
@@ -815,6 +904,23 @@
     </div>
   </div>
 
+  <!-- Payment Proof Screenshot Modal -->
+  <div class="admin-modal-backdrop" id="proofViewModal" aria-hidden="true">
+    <div class="admin-modal-card" style="max-width: 520px; text-align: center; padding: 24px;">
+      <div class="modal-head" style="margin-bottom: 14px;">
+        <h3 id="proofModalTitle">Payment Screenshot Proof</h3>
+        <button type="button" id="closeProofModalBtn" class="modal-close-x">&times;</button>
+      </div>
+      <div style="max-height: 65vh; overflow: auto; background: #1F1D24; border-radius: 8px; padding: 10px; display: flex; align-items: center; justify-content: center;">
+        <img id="proofModalImg" src="" alt="Payment Proof" style="max-width: 100%; max-height: 60vh; object-fit: contain; border-radius: 4px;">
+      </div>
+      <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <a id="proofDownloadLink" href="#" target="_blank" class="btn-admin-secondary">Open Full Image ↗</a>
+        <button type="button" id="closeProofModalBtn2" class="btn-admin-subtle">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div class="admin-toast-container" id="adminToastContainer"></div>
 
@@ -822,8 +928,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js?v=1.0.8"></script>
-  <script src="products.js?v=1.0.8"></script>
-  <script src="admin.js?v=1.0.8"></script>
+  <script src="firebase-config.js?v=1.0.9"></script>
+  <script src="products.js?v=1.0.9"></script>
+  <script src="admin.js?v=1.0.9"></script>
 </body>
 </html>

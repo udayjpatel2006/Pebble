@@ -63,7 +63,11 @@ const DEFAULT_SITE_CONFIG = {
   // Store Policies
   freeShippingThreshold: 799,
   shippingCharge: 50,
-  footerCopyrightNotice: "© 2026 Pebble Books & Papercraft. Handcrafted with care for book lovers."
+  footerCopyrightNotice: "© 2026 Pebble Books & Papercraft. Handcrafted with care for book lovers.",
+
+  // UPI Payment Configuration
+  merchantUpiId: "pebbleee17@gmail.com",
+  merchantUpiName: "Pebble Books"
 };
 
 const DEFAULT_PRODUCTS = [

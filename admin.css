@@ -1135,4 +1135,230 @@ button {
   }
 }
 
+/* ==========================================================================
+   ADMIN ORDERS & UPI VERIFICATION STYLES
+   ========================================================================== */
+.order-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.order-stat-chip {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-stat-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(25, 23, 20, 0.06);
+}
+
+.order-stat-chip.active {
+  background: #FDFBF8;
+  box-shadow: 0 2px 8px rgba(25, 23, 20, 0.08);
+}
+
+.stat-chip-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.stat-chip-val {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-main);
+  font-family: monospace;
+}
+
+.orders-table td {
+  vertical-align: top;
+  padding: 12px 14px;
+  font-size: 0.84rem;
+}
+
+.order-id-cell code {
+  font-family: monospace;
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 0.9rem;
+}
+
+.order-date-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.order-cust-name {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.order-cust-phone {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.order-cust-addr {
+  font-size: 0.78rem;
+  color: var(--text-body);
+  margin-top: 4px;
+  line-height: 1.35;
+  max-width: 220px;
+}
+
+.order-notes-pill {
+  display: inline-block;
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.order-item-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.order-item-qty {
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 0.78rem;
+}
+
+.order-amount-display {
+  font-weight: 800;
+  color: var(--color-primary);
+  font-size: 1.05rem;
+  font-family: monospace;
+}
+
+.order-utr-badge {
+  font-family: monospace;
+  font-weight: 700;
+  background: #EFE8DC;
+  color: #342E40;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  font-size: 0.82rem;
+  margin-top: 4px;
+}
+
+.proof-thumb-preview {
+  width: 44px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.proof-thumb-preview:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Status Badges in Admin Table */
+.order-badge-pending {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FCD34D;
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.order-badge-paid {
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #86EFAC;
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.order-badge-cancelled {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FCA5A5;
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Admin Verification Buttons */
+.btn-order-verify {
+  background: #16A34A;
+  color: #FFFFFF;
+  border: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-order-verify:hover {
+  background: #15803D;
+  transform: translateY(-1px);
+}
+
+.btn-order-cancel {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-order-cancel:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+}
+
+.nav-badge-pending {
+  background: #D97706 !important;
+  color: #FFFFFF !important;
+  font-weight: 700;
+}
+
 

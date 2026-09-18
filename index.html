@@ -7,7 +7,7 @@
   <meta name="description" content="Local handcrafted books, journals, sketchbooks, and planners with custom designs and archival paper.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="styles.css?v=1.0.8">
+  <link rel="stylesheet" href="styles.css?v=1.0.9">
 </head>
 <body>
 
@@ -299,6 +299,120 @@
     </div>
   </div>
 
+  <!-- UPI Payment & Verification Modal -->
+  <div class="modal-backdrop" id="upiPaymentModal" aria-hidden="true">
+    <div class="modal-card upi-modal-card">
+      <button class="modal-close-btn" id="closeUpiModalBtn" aria-label="Close payment">&times;</button>
+      
+      <div class="upi-modal-header">
+        <div class="upi-header-badge">Instant UPI Scan &amp; Pay</div>
+        <h2 style="font-family: var(--font-serif); font-size: 1.65rem; margin: 4px 0 6px;">Pay via UPI / QR</h2>
+        <p class="checkout-subtitle" style="margin-bottom: 12px;">Scan the dynamic QR code with Google Pay, PhonePe, Paytm, or BHIM.</p>
+      </div>
+
+      <!-- Locked Order Total -->
+      <div class="upi-amount-lock-box">
+        <div class="upi-lock-label">Total Payable (Locked):</div>
+        <div class="upi-lock-amount" id="upiLockedAmount">₹0</div>
+        <div class="upi-lock-hint">Order ID: <strong id="upiDisplayOrderId">PEB-000000</strong></div>
+      </div>
+
+      <!-- QR Code and VPA Details -->
+      <div class="upi-qr-section">
+        <div class="upi-qr-frame">
+          <img id="upiQrCodeImg" src="" alt="Pebble UPI QR Code" class="upi-qr-image">
+          <div id="upiQrLoading" class="upi-qr-loading">Generating secure UPI QR...</div>
+        </div>
+
+        <div class="upi-vpa-copy-box">
+          <span class="upi-vpa-label">Merchant UPI ID:</span>
+          <div class="upi-vpa-row">
+            <code class="upi-vpa-code" id="upiMerchantVpa">pebbleee17@gmail.com</code>
+            <button type="button" id="copyUpiIdBtn" class="btn-copy-upi" title="Copy UPI ID">
+              <span id="copyUpiBtnText">📋 Copy</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mobile UPI Intent Button (Opens UPI App directly on phones) -->
+        <div class="upi-mobile-intent-wrap">
+          <a id="upiDeepLinkBtn" href="#" class="btn-upi-intent" target="_blank" rel="noopener noreferrer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+            Pay with UPI App (GPay / PhonePe / Paytm)
+          </a>
+        </div>
+      </div>
+
+      <!-- Instructions & UTR Reference Form -->
+      <div class="upi-verification-form">
+        <div class="upi-steps-guide">
+          <div class="upi-step-item">
+            <span class="upi-step-num">1</span>
+            <span>Pay exactly <strong id="upiStepAmount">₹0</strong> on your UPI app</span>
+          </div>
+          <div class="upi-step-item">
+            <span class="upi-step-num">2</span>
+            <span>Find the <strong>12-digit UPI Ref / UTR number</strong> in your transaction receipt</span>
+          </div>
+          <div class="upi-step-item">
+            <span class="upi-step-num">3</span>
+            <span>Enter the UTR below and click <strong>Submit Reference</strong></span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 14px;">
+          <label for="upiUtrInput" style="font-weight: 700; color: var(--color-text-main);">
+            12-Digit UPI Reference / UTR Number *
+          </label>
+          <input 
+            type="text" 
+            id="upiUtrInput" 
+            class="form-input upi-utr-input" 
+            placeholder="e.g. 423987654321" 
+            maxlength="12" 
+            pattern="[0-9]{12}" 
+            inputmode="numeric" 
+            autocomplete="off"
+            required
+          >
+          <span class="field-hint" style="font-size: 0.78rem; color: var(--color-text-muted);">
+            Found in your UPI app payment details as "UPI Ref No", "UTR", or "Transaction ID".
+          </span>
+        </div>
+
+        <div class="form-group" style="margin-top: 10px;">
+          <label for="upiProofFile" style="font-weight: 600; font-size: 0.84rem; color: var(--color-text-muted);">
+            Attach Payment Screenshot (Optional reference only)
+          </label>
+          <input type="file" id="upiProofFile" class="form-input" accept="image/*" style="font-size: 0.82rem; padding: 7px 10px;">
+        </div>
+
+        <!-- Strict Security Warnings (Zero PIN / Zero OTP) -->
+        <div class="upi-security-notice">
+          <div class="security-notice-icon">🛡️</div>
+          <div class="security-notice-text">
+            <strong>Security Guarantee:</strong> Pebble will <strong>NEVER</strong> ask for your UPI PIN, OTP, or bank passwords. Your UPI PIN is only entered inside your official banking app to authorize debits.
+          </div>
+        </div>
+
+        <div class="upi-verification-notice">
+          ℹ️ Payment references are manually verified against bank account credits before dispatch. Submitting a reference creates a <strong>Pending Verification</strong> order.
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+          <button type="button" id="cancelUpiPaymentBtn" class="btn-secondary" style="flex: 0.8; padding: 12px; border-radius: var(--radius-pill); font-size: 0.88rem; background: var(--color-bg-subtle); border: 1px solid var(--color-border); cursor: pointer;">
+            ← Back
+          </button>
+          <button type="button" id="submitUpiProofBtn" class="btn-primary" style="flex: 1.4; padding: 12px; font-size: 0.92rem;">
+            I Have Paid — Submit Reference
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Order Success Confirmation Modal -->
   <div class="modal-backdrop" id="successModal" aria-hidden="true">
     <div class="modal-card" style="max-width: 500px; padding: 36px; text-align: center;">
@@ -440,8 +554,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js?v=1.0.8"></script>
-  <script src="products.js?v=1.0.8"></script>
-  <script src="app.js?v=1.0.8"></script>
+  <script src="firebase-config.js?v=1.0.9"></script>
+  <script src="products.js?v=1.0.9"></script>
+  <script src="app.js?v=1.0.9"></script>
 </body>
 </html>
