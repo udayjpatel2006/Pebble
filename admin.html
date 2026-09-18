@@ -529,6 +529,36 @@
               <span class="field-hint">Shown in customer's UPI app payment confirmation screen.</span>
             </div>
           </div>
+
+          <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-color, #E8DEC8);">
+            <h4 style="font-size: 0.95rem; margin-bottom: 4px; color: var(--color-primary); font-weight: 700;">
+              Business UPI QR Code Image (PhonePe / GPay / Paytm / Bank QR)
+            </h4>
+            <p class="field-hint" style="margin-bottom: 12px;">
+              Upload your official merchant QR code poster or screenshot. If uploaded, this exact QR image link will be sent to customers in their WhatsApp order message and displayed during checkout!
+            </p>
+            <div class="cover-design-upload-row">
+              <div class="book-cover-preview-frame" style="width: 120px; height: 120px; border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--border-color, #D4C5A9);">
+                <img id="merchantQrPreviewImg" src="assets/pebble-logo.svg" alt="UPI QR Preview" style="width: 100%; height: 100%; object-fit: contain; padding: 4px;">
+                <div class="cover-preview-tag">QR Preview</div>
+              </div>
+              <div class="cover-upload-actions" style="flex: 1;">
+                <div class="file-upload-wrap" style="margin-bottom: 10px;">
+                  <input type="file" id="merchantQrFileInput" accept="image/*" class="file-input-hidden">
+                  <label for="merchantQrFileInput" class="btn-admin-primary" style="cursor: pointer; padding: 9px 18px; font-size: 0.86rem;">
+                    📁 Upload Official QR Image...
+                  </label>
+                  <button type="button" id="clearMerchantQrBtn" class="btn-admin-subtle" style="font-size: 0.8rem;">
+                    Remove Custom QR
+                  </button>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="merchantQrUrlInput" style="font-size: 0.82rem; font-weight: 600;">Or Paste QR Image URL / Cloud Path:</label>
+                  <input type="text" id="merchantQrUrlInput" class="admin-input" placeholder="e.g. uploads/qr_mybusiness.jpg or https://..." style="font-size: 0.86rem;">
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

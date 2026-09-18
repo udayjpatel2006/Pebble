@@ -67,7 +67,8 @@ const DEFAULT_SITE_CONFIG = {
 
   // UPI Payment Configuration
   merchantUpiId: "pebbleee17@gmail.com",
-  merchantUpiName: "Pebble Books"
+  merchantUpiName: "Pebble Books",
+  merchantQrImageUrl: ""
 };
 
 const DEFAULT_PRODUCTS = [

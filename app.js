@@ -1254,6 +1254,29 @@
     message += `*Delivery:* ${shipping}\n`;
     message += `*Estimated Total:* ₹${grandTotal}\n`;
 
+    // Direct UPI Payment & QR Details
+    const merchantVpa = (siteConfig.merchantUpiId || 'pebbleee17@gmail.com').trim();
+    const merchantName = (siteConfig.merchantUpiName || storeBrand || 'Pebble Books').trim();
+    const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&cu=INR&tn=${encodeURIComponent('Pebble Order')}`;
+    
+    let qrLink = '';
+    if (siteConfig.merchantQrImageUrl && siteConfig.merchantQrImageUrl.trim()) {
+      const rawQr = siteConfig.merchantQrImageUrl.trim();
+      if (rawQr.startsWith('http://') || rawQr.startsWith('https://')) {
+        qrLink = rawQr;
+      } else {
+        qrLink = `${window.location.origin}/${rawQr.replace(/^\/+/, '')}`;
+      }
+    } else {
+      qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUri)}`;
+    }
+
+    message += `\n------------------------------------\n`;
+    message += `💳 *DIRECT UPI PAYMENT DETAILS:*\n`;
+    message += `• *Amount to Pay:* ₹${grandTotal}\n`;
+    message += `• *UPI ID:* ${merchantVpa} (Pay via GPay, PhonePe, Paytm)\n`;
+    message += `• *Scan & Pay QR Link:* ${qrLink}\n`;
+
     if (extraDetails && extraDetails.name) {
       message += `\n*CUSTOMER DETAILS:*\n`;
       message += `• *Name:* ${extraDetails.name}\n`;
@@ -1341,20 +1364,27 @@
       upiDeepLinkBtn.href = upiUri;
     }
 
-    // Dynamic QR Code generation with fallback
+    // QR Code display (official business QR or dynamic locked-amount QR)
     if (upiQrCodeImg && upiQrLoading) {
       upiQrLoading.style.display = 'block';
       upiQrCodeImg.style.display = 'none';
 
-      const primaryQr = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(upiUri)}`;
+      const customQr = (siteConfig.merchantQrImageUrl || '').trim();
+      const dynamicQr = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(upiUri)}`;
+      const primaryQr = customQr || dynamicQr;
+
       upiQrCodeImg.onload = () => {
         upiQrLoading.style.display = 'none';
         upiQrCodeImg.style.display = 'block';
       };
       upiQrCodeImg.onerror = () => {
-        upiQrCodeImg.src = `https://quickchart.io/qr?size=240&text=${encodeURIComponent(upiUri)}`;
-        upiQrLoading.style.display = 'none';
-        upiQrCodeImg.style.display = 'block';
+        if (customQr && upiQrCodeImg.src !== dynamicQr) {
+          upiQrCodeImg.src = dynamicQr;
+        } else {
+          upiQrCodeImg.src = `https://quickchart.io/qr?size=240&text=${encodeURIComponent(upiUri)}`;
+          upiQrLoading.style.display = 'none';
+          upiQrCodeImg.style.display = 'block';
+        }
       };
       upiQrCodeImg.src = primaryQr;
     }

@@ -244,14 +244,18 @@ async function createCloudOrder(orderData) {
   }
   saveLocalOrders(localOrders);
 
-  // 2. Persist to Firestore
+  // 2. Persist to Firestore in background (non-blocking for instant UI response)
   if (isFirebaseConfigured && firestoreDb) {
-    try {
-      await firestoreDb.collection("orders").doc(order.id).set(order, { merge: true });
-      console.log(`[Pebble Firebase] Order ${order.id} saved to Firestore.`);
-    } catch (err) {
-      console.warn("[Pebble Firebase] Could not save order to Firestore:", err.message);
-    }
+    firestoreDb
+      .collection("orders")
+      .doc(order.id)
+      .set(order, { merge: true })
+      .then(() => {
+        console.log(`[Pebble Firebase] Order ${order.id} saved to Firestore.`);
+      })
+      .catch((err) => {
+        console.warn("[Pebble Firebase] Could not save order to Firestore:", err.message);
+      });
   }
 
   return order;
@@ -277,14 +281,18 @@ async function updateCloudOrderPaymentProof(orderId, utr, screenshotUrl = '') {
     saveLocalOrders(localOrders);
   }
 
-  // 2. Update Firestore
+  // 2. Update Firestore in background
   if (isFirebaseConfigured && firestoreDb) {
-    try {
-      await firestoreDb.collection("orders").doc(orderId).set(updateData, { merge: true });
-      console.log(`[Pebble Firebase] Order ${orderId} payment proof updated in Firestore.`);
-    } catch (err) {
-      console.warn("[Pebble Firebase] Error updating payment proof in Firestore:", err.message);
-    }
+    firestoreDb
+      .collection("orders")
+      .doc(orderId)
+      .set(updateData, { merge: true })
+      .then(() => {
+        console.log(`[Pebble Firebase] Order ${orderId} payment proof updated in Firestore.`);
+      })
+      .catch((err) => {
+        console.warn("[Pebble Firebase] Error updating payment proof in Firestore:", err.message);
+      });
   }
 
   return true;

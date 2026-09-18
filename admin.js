@@ -111,6 +111,10 @@
   const waFooterRedirectInput = document.getElementById('waFooterRedirectInput');
   const merchantUpiInput = document.getElementById('merchantUpiInput');
   const merchantUpiNameInput = document.getElementById('merchantUpiNameInput');
+  const merchantQrPreviewImg = document.getElementById('merchantQrPreviewImg');
+  const merchantQrFileInput = document.getElementById('merchantQrFileInput');
+  const merchantQrUrlInput = document.getElementById('merchantQrUrlInput');
+  const clearMerchantQrBtn = document.getElementById('clearMerchantQrBtn');
 
   // DOM Elements - Orders Management
   const ordersCountBadge = document.getElementById('ordersCountBadge');
@@ -531,6 +535,8 @@
     // UPI Payment Settings
     if (merchantUpiInput) merchantUpiInput.value = siteConfig.merchantUpiId || 'pebbleee17@gmail.com';
     if (merchantUpiNameInput) merchantUpiNameInput.value = siteConfig.merchantUpiName || 'Pebble Books';
+    if (merchantQrUrlInput) merchantQrUrlInput.value = siteConfig.merchantQrImageUrl || '';
+    if (merchantQrPreviewImg) merchantQrPreviewImg.src = siteConfig.merchantQrImageUrl || 'assets/pebble-logo.svg';
 
     // Settings
     freeShippingThresholdInput.value = siteConfig.freeShippingThreshold || 799;
@@ -961,6 +967,56 @@
       });
     }
 
+    // Merchant Business QR Code Upload & Optimization
+    if (merchantQrFileInput) {
+      merchantQrFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          showToast('Uploading & optimizing business QR code...');
+          const uploadedUrl = await processAndUploadImage(file, 'qr');
+          if (merchantQrUrlInput) merchantQrUrlInput.value = uploadedUrl;
+          if (merchantQrPreviewImg) merchantQrPreviewImg.src = uploadedUrl;
+
+          siteConfig.merchantQrImageUrl = uploadedUrl;
+          saveSiteConfig(siteConfig);
+          if (typeof saveCloudSiteConfig === 'function') {
+            saveCloudSiteConfig(siteConfig);
+          }
+          showToast('✅ Business QR code saved and updated!');
+        } catch (err) {
+          showToast('QR upload error: ' + err.message);
+        }
+      });
+    }
+
+    if (merchantQrUrlInput) {
+      merchantQrUrlInput.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (merchantQrPreviewImg) merchantQrPreviewImg.src = val || 'assets/pebble-logo.svg';
+        siteConfig.merchantQrImageUrl = val;
+        saveSiteConfig(siteConfig);
+        if (typeof saveCloudSiteConfig === 'function') {
+          saveCloudSiteConfig(siteConfig);
+        }
+      });
+    }
+
+    if (clearMerchantQrBtn) {
+      clearMerchantQrBtn.addEventListener('click', () => {
+        if (merchantQrUrlInput) merchantQrUrlInput.value = '';
+        if (merchantQrPreviewImg) merchantQrPreviewImg.src = 'assets/pebble-logo.svg';
+        if (merchantQrFileInput) merchantQrFileInput.value = '';
+        siteConfig.merchantQrImageUrl = '';
+        saveSiteConfig(siteConfig);
+        if (typeof saveCloudSiteConfig === 'function') {
+          saveCloudSiteConfig(siteConfig);
+        }
+        showToast('Custom business QR code removed.');
+      });
+    }
+
     // Custom Cover Image Upload for Book (Colour selection removed)
     if (editCustomImageFile) {
       editCustomImageFile.addEventListener('change', async (e) => {
@@ -1163,6 +1219,7 @@
 
       merchantUpiId: merchantUpiInput ? merchantUpiInput.value.trim() : (siteConfig.merchantUpiId || 'pebbleee17@gmail.com'),
       merchantUpiName: merchantUpiNameInput ? merchantUpiNameInput.value.trim() : (siteConfig.merchantUpiName || 'Pebble Books'),
+      merchantQrImageUrl: merchantQrUrlInput ? merchantQrUrlInput.value.trim() : (siteConfig.merchantQrImageUrl || ''),
 
       freeShippingThreshold: Number(freeShippingThresholdInput.value) || 799,
       shippingCharge: Number(shippingChargeInput.value) || 50
