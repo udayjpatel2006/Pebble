@@ -309,6 +309,12 @@ function getSiteConfig() {
         parsed.trustItems[1].title = 'Custom Design';
         parsed.trustItems[1].desc = 'Custom design';
       }
+      if (parsed.whatsappNumber) {
+        let cleanWa = String(parsed.whatsappNumber).replace(/\D/g, '');
+        if (cleanWa.length === 10) cleanWa = '91' + cleanWa;
+        else if (cleanWa.length === 11 && cleanWa.startsWith('0')) cleanWa = '91' + cleanWa.slice(1);
+        parsed.whatsappNumber = cleanWa || '919876543210';
+      }
       return { ...DEFAULT_SITE_CONFIG, ...parsed };
     }
   } catch (e) {

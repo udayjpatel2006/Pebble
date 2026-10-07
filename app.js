@@ -68,12 +68,20 @@
   // INITIALIZATION
   // ==========================================
   async function init() {
-    await loadData();
+    // 1. Immediately load cart from localStorage & render UI (zero latency, accurate bag counts)
     loadCartFromStorage();
+
+    // 2. Setup interactive event listeners
     setupEventListeners();
 
-    // Listen for changes from admin panel in another tab
+    // 3. Load catalog and site configuration
+    await loadData();
+
+    // 4. Cross-tab storage synchronization
     window.addEventListener('storage', async (e) => {
+      if (e.key === 'pebble_cart') {
+        loadCartFromStorage();
+      }
       if (e.key === 'pebble_site_config' || e.key === 'pebble_products') {
         await loadData();
       }
@@ -260,8 +268,8 @@
     // Nav WhatsApp
     const navWhatsAppPill = document.getElementById('navWhatsAppPill');
     if (navWhatsAppPill) {
-      const waMsg = encodeURIComponent(siteConfig.whatsappNavRedirectText || 'Hello Pebble!');
-      navWhatsAppPill.href = `https://wa.me/${siteConfig.whatsappNumber || '919876543210'}?text=${waMsg}`;
+      const waMsg = siteConfig.whatsappNavRedirectText || 'Hello Pebble! I would like to inquire about your books.';
+      navWhatsAppPill.href = getWhatsAppUrl(siteConfig.whatsappNumber, waMsg);
     }
 
     // Footer Contact Channels (Gmail, Instagram, WhatsApp)
@@ -283,9 +291,10 @@
     const footerWhatsAppCard = document.getElementById('footerWhatsAppCard');
     const footerWhatsAppLabel = document.getElementById('footerWhatsAppLabel');
     if (footerWhatsAppCard && footerWhatsAppLabel) {
-      const waMsg = encodeURIComponent(siteConfig.whatsappFooterRedirectText || 'Hello Pebble!');
-      footerWhatsAppCard.href = `https://wa.me/${siteConfig.whatsappNumber || '919876543210'}?text=${waMsg}`;
-      footerWhatsAppLabel.textContent = '+' + (siteConfig.whatsappNumber || '919876543210');
+      const cleanPhone = formatWhatsAppPhone(siteConfig.whatsappNumber);
+      const waMsg = siteConfig.whatsappFooterRedirectText || 'Hello Pebble! I visited your website and want to place an order.';
+      footerWhatsAppCard.href = getWhatsAppUrl(cleanPhone, waMsg);
+      footerWhatsAppLabel.textContent = '+' + cleanPhone;
     }
 
     // Footer studio info
@@ -300,17 +309,65 @@
     if (footerCopy) footerCopy.textContent = siteConfig.footerCopyrightNotice || '';
   }
 
+  // ==========================================
+  // WHATSAPP URL HELPERS
+  // ==========================================
+  function formatWhatsAppPhone(phone) {
+    let clean = String(phone || '').replace(/\D/g, '');
+    if (clean.length === 10) {
+      clean = '91' + clean;
+    } else if (clean.length === 11 && clean.startsWith('0')) {
+      clean = '91' + clean.slice(1);
+    }
+    if (!clean || clean.length < 8) {
+      clean = '919876543210';
+    }
+    return clean;
+  }
+
+  function getWhatsAppUrl(phone, text) {
+    const cleanPhone = formatWhatsAppPhone(phone);
+    const encodedText = encodeURIComponent(text || '');
+    // Using api.whatsapp.com/send directly avoids DNS errors ("This site can't be reached")
+    return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+  }
+
+  function openWhatsAppLink(url) {
+    try {
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = url;
+      }
+    } catch (e) {
+      window.location.href = url;
+    }
+  }
+
   // Load cart from localStorage
   function loadCartFromStorage() {
     try {
       const saved = localStorage.getItem('pebble_cart');
       if (saved) {
-        cart = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          cart = parsed
+            .filter((item) => item && item.id && (Number(item.quantity) || 0) > 0)
+            .map((item) => ({
+              ...item,
+              price: Number(item.price) || 0,
+              quantity: Math.max(1, Number(item.quantity) || 1)
+            }));
+        } else {
+          cart = [];
+        }
+      } else {
+        cart = [];
       }
     } catch (e) {
       console.warn('Failed to load cart from storage', e);
       cart = [];
     }
+    updateCartUI();
   }
 
   function saveCartToStorage() {
@@ -815,7 +872,7 @@
                     </div>
                   </div>
 
-                  <button class="btn-add-cart" onclick="addToCart('${escapeHtml(product.id)}')" aria-label="Add ${escapeHtml(product.title || '')} to bag">
+                  <button type="button" class="btn-add-cart" onclick="event.stopPropagation(); addToCart('${escapeHtml(product.id)}', 1, event);" aria-label="Add ${escapeHtml(product.title || '')} to bag">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                       <path d="M12 5v14M5 12h14"></path>
                     </svg>
@@ -911,6 +968,8 @@
   window.openQuickView = function (productId) {
     const product = productsList.find((p) => p.id === productId);
     if (!product) return;
+
+    quickViewQuantity = 1;
 
     const coverSvgHtml = getBookCoverSvg(product);
     const backCoverHtml = (typeof getBookBackCoverHtml === 'function')
@@ -1074,25 +1133,29 @@
   // ==========================================
   // SHOPPING CART MANAGEMENT
   // ==========================================
-  window.addToCart = function (productId, quantity = 1) {
+  window.addToCart = function (productId, quantity = 1, event = null) {
+    if (event && typeof event.stopPropagation === 'function') {
+      event.stopPropagation();
+    }
     const product = productsList.find((p) => p.id === productId);
     if (!product) return;
 
+    const numQty = Math.max(1, Number(quantity) || 1);
     const existingIndex = cart.findIndex((item) => item.id === productId);
     if (existingIndex > -1) {
-      cart[existingIndex].quantity += quantity;
+      cart[existingIndex].quantity = (Number(cart[existingIndex].quantity) || 0) + numQty;
     } else {
       cart.push({
         id: product.id,
         title: product.title,
         designName: product.designName,
         pages: product.pages,
-        price: product.price,
+        price: Number(product.price) || 0,
         coverColor: product.coverColor,
         patternType: product.patternType,
         customImageUrl: product.customImageUrl,
         customBackImageUrl: product.customBackImageUrl || product.backImageUrl || '',
-        quantity: quantity
+        quantity: numQty
       });
     }
 
@@ -1105,10 +1168,13 @@
     const itemIndex = cart.findIndex((item) => item.id === productId);
     if (itemIndex === -1) return;
 
-    cart[itemIndex].quantity += delta;
-    if (cart[itemIndex].quantity <= 0) {
+    const currentQty = Number(cart[itemIndex].quantity) || 1;
+    const newQty = currentQty + Number(delta);
+    if (newQty <= 0) {
       cart.splice(itemIndex, 1);
       showToast('Item removed from bag');
+    } else {
+      cart[itemIndex].quantity = newQty;
     }
 
     saveCartToStorage();
@@ -1123,27 +1189,34 @@
   };
 
   function updateCartUI() {
-    const totalCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
-    const threshold = siteConfig.freeShippingThreshold || 799;
+    const totalCount = cart.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0);
+    const subtotal = cart.reduce((acc, item) => acc + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+    const threshold = Number(siteConfig.freeShippingThreshold) || 799;
 
     // Badge
-    cartCountBadge.textContent = totalCount;
-    cartSubtotal.textContent = `₹${subtotal}`;
+    if (cartCountBadge) {
+      cartCountBadge.textContent = totalCount;
+    }
+    if (cartSubtotal) {
+      cartSubtotal.textContent = `₹${subtotal}`;
+    }
 
     // Free shipping tracker
-    if (subtotal >= threshold) {
-      shippingNotice.innerHTML = `🎉 You have unlocked <strong>FREE Local Doorstep Delivery!</strong>`;
-      shippingNotice.style.background = '#E7F9EE';
-      shippingNotice.style.color = '#1EBE5D';
-    } else {
-      const remaining = threshold - subtotal;
-      shippingNotice.innerHTML = `Add <strong>₹${remaining}</strong> more to unlock <strong>FREE Local Delivery</strong>!`;
-      shippingNotice.style.background = 'var(--color-secondary-light)';
-      shippingNotice.style.color = 'var(--color-secondary)';
+    if (shippingNotice) {
+      if (subtotal >= threshold) {
+        shippingNotice.innerHTML = `🎉 You have unlocked <strong>FREE Local Doorstep Delivery!</strong>`;
+        shippingNotice.style.background = '#E7F9EE';
+        shippingNotice.style.color = '#1EBE5D';
+      } else {
+        const remaining = threshold - subtotal;
+        shippingNotice.innerHTML = `Add <strong>₹${remaining}</strong> more to unlock <strong>FREE Local Delivery</strong>!`;
+        shippingNotice.style.background = 'var(--color-secondary-light)';
+        shippingNotice.style.color = 'var(--color-secondary)';
+      }
     }
 
     // Render Items
+    if (!cartItemsList) return;
     if (cart.length === 0) {
       cartItemsList.innerHTML = `
         <div class="cart-empty-msg">
@@ -1155,13 +1228,15 @@
     } else {
       cartItemsList.innerHTML = cart
         .map((item) => {
+          const itemQty = Number(item.quantity) || 1;
+          const itemPrice = Number(item.price) || 0;
           return `
           <div class="cart-item">
             <div class="cart-item-thumb">
               ${item.customImageUrl 
                 ? `<img src="${item.customImageUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;" alt="thumb">`
                 : `<div style="width: 44px; height: 60px; background: ${item.coverColor || '#C86446'}; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 0.65rem; font-weight: 700; text-align: center; padding: 2px;">
-                    ${item.pages}p
+                    ${item.pages || 120}p
                   </div>`
               }
             </div>
@@ -1173,14 +1248,14 @@
 
               <div class="cart-item-row-controls">
                 <div class="qty-counter" style="padding: 2px;">
-                  <button class="qty-btn" style="width: 24px; height: 24px; font-size: 0.9rem;" onclick="updateCartQty('${item.id}', -1)">-</button>
-                  <span class="qty-value" style="padding: 0 10px; font-size: 0.85rem;">${item.quantity}</span>
-                  <button class="qty-btn" style="width: 24px; height: 24px; font-size: 0.9rem;" onclick="updateCartQty('${item.id}', 1)">+</button>
+                  <button type="button" class="qty-btn" style="width: 24px; height: 24px; font-size: 0.9rem;" onclick="updateCartQty('${item.id}', -1)" aria-label="Decrease quantity">-</button>
+                  <span class="qty-value" style="padding: 0 10px; font-size: 0.85rem;">${itemQty}</span>
+                  <button type="button" class="qty-btn" style="width: 24px; height: 24px; font-size: 0.9rem;" onclick="updateCartQty('${item.id}', 1)" aria-label="Increase quantity">+</button>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 12px;">
-                  <span class="cart-item-price">₹${item.price * item.quantity}</span>
-                  <button class="cart-item-remove-btn" onclick="removeFromCart('${item.id}')" title="Remove">✕</button>
+                  <span class="cart-item-price">₹${itemPrice * itemQty}</span>
+                  <button type="button" class="cart-item-remove-btn" onclick="removeFromCart('${item.id}')" title="Remove">✕</button>
                 </div>
               </div>
             </div>
@@ -1211,6 +1286,7 @@
   }
 
   function openCart() {
+    updateCartUI();
     cartBackdrop.classList.add('open');
     cartBackdrop.setAttribute('aria-hidden', 'false');
   }
@@ -1227,15 +1303,18 @@
   // WHATSAPP ORDER GENERATOR (Direct Local Order)
   // ==========================================
   function triggerWhatsAppOrder(extraDetails = null) {
-    if (cart.length === 0) return;
+    if (cart.length === 0) {
+      showToast('Your bag is empty. Please select a book!');
+      return;
+    }
 
-    const threshold = siteConfig.freeShippingThreshold || 799;
-    const shippingFee = siteConfig.shippingCharge || 50;
-    const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    const threshold = Number(siteConfig.freeShippingThreshold) || 799;
+    const shippingFee = Number(siteConfig.shippingCharge) || 50;
+    const subtotal = cart.reduce((acc, item) => acc + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
     const shipping = subtotal >= threshold ? 'FREE (Local Delivery)' : `₹${shippingFee}`;
     const grandTotal = subtotal >= threshold ? subtotal : subtotal + shippingFee;
     const storeBrand = siteConfig.brandName || 'PEBBLE';
-    const waNumber = siteConfig.whatsappNumber || '919876543210';
+    const cleanPhone = formatWhatsAppPhone(siteConfig.whatsappNumber);
 
     let message = `*NEW ORDER - ${storeBrand.toUpperCase()} BOOKS* 📚✨\n`;
     message += `Hello ${storeBrand}! I would like to place an order from your website.\n\n`;
@@ -1243,10 +1322,12 @@
     message += `------------------------------------\n`;
 
     cart.forEach((item, idx) => {
+      const itemQty = Number(item.quantity) || 1;
+      const itemPrice = Number(item.price) || 0;
       message += `${idx + 1}. *${item.title}*\n`;
       message += `   • *Design:* ${item.designName}\n`;
       message += `   • *Pages:* ${item.pages} Pages\n`;
-      message += `   • *Qty:* ${item.quantity} × ₹${item.price} = ₹${item.quantity * item.price}\n\n`;
+      message += `   • *Qty:* ${itemQty} × ₹${itemPrice} = ₹${itemQty * itemPrice}\n\n`;
     });
 
     message += `------------------------------------\n`;
@@ -1254,28 +1335,12 @@
     message += `*Delivery:* ${shipping}\n`;
     message += `*Estimated Total:* ₹${grandTotal}\n`;
 
-    // Direct UPI Payment & QR Details
+    // Direct UPI Payment Details
     const merchantVpa = (siteConfig.merchantUpiId || 'pebbleee17@gmail.com').trim();
-    const merchantName = (siteConfig.merchantUpiName || storeBrand || 'Pebble Books').trim();
-    const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&cu=INR&tn=${encodeURIComponent('Pebble Order')}`;
-    
-    let qrLink = '';
-    if (siteConfig.merchantQrImageUrl && siteConfig.merchantQrImageUrl.trim()) {
-      const rawQr = siteConfig.merchantQrImageUrl.trim();
-      if (rawQr.startsWith('http://') || rawQr.startsWith('https://')) {
-        qrLink = rawQr;
-      } else {
-        qrLink = `${window.location.origin}/${rawQr.replace(/^\/+/, '')}`;
-      }
-    } else {
-      qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUri)}`;
-    }
-
     message += `\n------------------------------------\n`;
     message += `💳 *DIRECT UPI PAYMENT DETAILS:*\n`;
     message += `• *Amount to Pay:* ₹${grandTotal}\n`;
     message += `• *UPI ID:* ${merchantVpa} (Pay via GPay, PhonePe, Paytm)\n`;
-    message += `• *Scan & Pay QR Link:* ${qrLink}\n`;
 
     if (extraDetails && extraDetails.name) {
       message += `\n*CUSTOMER DETAILS:*\n`;
@@ -1288,10 +1353,8 @@
 
     message += `\nPlease confirm availability and dispatch time. Thank you!`;
 
-    const encoded = encodeURIComponent(message);
-    const waUrl = `https://wa.me/${waNumber}?text=${encoded}`;
-
-    window.open(waUrl, '_blank');
+    const waUrl = getWhatsAppUrl(cleanPhone, message);
+    openWhatsAppLink(waUrl);
   }
 
   // ==========================================
@@ -1458,17 +1521,16 @@
     closeUpiPaymentModal();
 
     // Construct WhatsApp notification link so customer can also optionally message Pebble
-    const waNumber = siteConfig.whatsappNumber || '919876543210';
-    const waMsgText = encodeURIComponent(
+    const cleanPhone = formatWhatsAppPhone(siteConfig.whatsappNumber);
+    const waMsgText =
       `*PEBBLE ORDER PAYMENT REFERENCE SUBMITTED* 📚✨\n` +
       `Hello Pebble! I have completed payment for my order.\n\n` +
       `• *Order ID:* ${currentActiveOrder.id}\n` +
       `• *Amount Paid:* ₹${currentActiveOrder.finalAmount}\n` +
       `• *12-Digit UTR:* ${utr}\n` +
       `• *Customer:* ${currentActiveOrder.customerName} (${currentActiveOrder.phone})\n\n` +
-      `Please verify the bank credit and confirm dispatch. Thank you!`
-    );
-    const waShareUrl = `https://wa.me/${waNumber}?text=${waMsgText}`;
+      `Please verify the bank credit and confirm dispatch. Thank you!`;
+    const waShareUrl = getWhatsAppUrl(cleanPhone, waMsgText);
 
     // Render receipt details with Pending Verification status badge
     orderReceiptDetails.innerHTML = `

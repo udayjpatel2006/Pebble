@@ -1213,7 +1213,12 @@
       gmailSubject: gmailSubjectInput.value.trim(),
       instagramHandle: instaHandleInput.value.trim(),
       instagramUrl: instaUrlInput.value.trim(),
-      whatsappNumber: waNumberInput.value.trim().replace(/\D/g, ''),
+      whatsappNumber: (() => {
+        let clean = waNumberInput.value.trim().replace(/\D/g, '');
+        if (clean.length === 10) clean = '91' + clean;
+        else if (clean.length === 11 && clean.startsWith('0')) clean = '91' + clean.slice(1);
+        return clean || '919876543210';
+      })(),
       whatsappNavRedirectText: waNavRedirectInput.value.trim(),
       whatsappFooterRedirectText: waFooterRedirectInput.value.trim(),
 
@@ -1630,8 +1635,9 @@
 
         // WhatsApp direct link
         const cleanPhone = (order.phone || '').replace(/\D/g, '');
+        const fullWa = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
         const waLink = cleanPhone
-          ? `https://wa.me/${cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone}`
+          ? `https://api.whatsapp.com/send?phone=${fullWa}`
           : '#';
 
         // Items breakdown
