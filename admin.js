@@ -177,6 +177,12 @@
   const editBestseller = document.getElementById('editBestseller');
   const editBadge = document.getElementById('editBadge');
 
+  // DOM Elements - Collections & Categories
+  const categoriesTableBody = document.getElementById('categoriesTableBody');
+  const addNewCategoryBtn = document.getElementById('addNewCategoryBtn');
+  const saveCategoriesBtn = document.getElementById('saveCategoriesBtn');
+  const clearCancelledOrdersBtn = document.getElementById('clearCancelledOrdersBtn');
+
   const adminToastContainer = document.getElementById('adminToastContainer');
 
   // ==========================================================================
@@ -386,6 +392,8 @@
     checkAuthentication();
     await loadData();
     populateFormValues();
+    populateProductCategoryDropdowns();
+    renderCategoriesTable();
     renderProductsTable();
     await loadOrders();
     setupEventListeners();
@@ -420,6 +428,8 @@
           siteConfig = cloudConfig;
           saveSiteConfig(cloudConfig);
           populateFormValues();
+          populateProductCategoryDropdowns();
+          renderCategoriesTable();
           hasChange = true;
         }
 
@@ -1132,6 +1142,54 @@
       });
     }
 
+    if (clearCancelledOrdersBtn) {
+      clearCancelledOrdersBtn.addEventListener('click', async () => {
+        const cancelled = ordersList.filter((o) => o.paymentStatus === 'CANCELLED');
+        if (cancelled.length === 0) {
+          showToast('No cancelled orders to delete.');
+          return;
+        }
+        if (!confirm(`Delete all ${cancelled.length} cancelled order(s) permanently? This cannot be undone.`)) return;
+
+        try {
+          showToast(`Deleting ${cancelled.length} cancelled orders...`);
+          for (const order of cancelled) {
+            if (typeof deleteCloudOrder === 'function') {
+              await deleteCloudOrder(order.id);
+            }
+          }
+          if (typeof getLocalOrders === 'function') {
+            const local = getLocalOrders();
+            const remaining = local.filter((o) => o.paymentStatus !== 'CANCELLED');
+            if (typeof saveLocalOrders === 'function') saveLocalOrders(remaining);
+          }
+          await loadOrders();
+          showToast(`🗑️ Deleted ${cancelled.length} cancelled order(s).`);
+        } catch (err) {
+          showToast('Error clearing cancelled orders: ' + err.message);
+        }
+      });
+    }
+
+    // Categories Manager Listeners
+    if (addNewCategoryBtn) {
+      addNewCategoryBtn.addEventListener('click', () => {
+        if (!Array.isArray(siteConfig.categories)) {
+          siteConfig.categories = JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG.categories));
+        }
+        siteConfig.categories.push({
+          id: 'custom-' + Date.now().toString().slice(-4),
+          name: 'New Collection'
+        });
+        renderCategoriesTable();
+        showToast('➕ New category row added. Edit title and click "Save Categories".');
+      });
+    }
+
+    if (saveCategoriesBtn) {
+      saveCategoriesBtn.addEventListener('click', handleSaveCategories);
+    }
+
     const orderFilterChips = document.querySelectorAll('.order-stat-chip');
     orderFilterChips.forEach((chip) => {
       chip.addEventListener('click', () => {
@@ -1227,7 +1285,28 @@
       merchantQrImageUrl: merchantQrUrlInput ? merchantQrUrlInput.value.trim() : (siteConfig.merchantQrImageUrl || ''),
 
       freeShippingThreshold: Number(freeShippingThresholdInput.value) || 799,
-      shippingCharge: Number(shippingChargeInput.value) || 50
+      shippingCharge: Number(shippingChargeInput.value) || 50,
+
+      categories: (() => {
+        if (categoriesTableBody) {
+          const rows = categoriesTableBody.querySelectorAll('tr[data-cat-id]');
+          if (rows.length > 0) {
+            const tableCats = [];
+            rows.forEach((r) => {
+              const origId = r.dataset.catId;
+              const idInput = r.querySelector('.cat-id-input');
+              const nameInput = r.querySelector('.cat-name-input');
+              const id = idInput ? idInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') : origId;
+              const name = nameInput ? nameInput.value.trim() : '';
+              if (id && name) tableCats.push({ id, name });
+            });
+            if (tableCats.length > 0) return tableCats;
+          }
+        }
+        return Array.isArray(siteConfig.categories) && siteConfig.categories.length > 0
+          ? siteConfig.categories
+          : (typeof DEFAULT_SITE_CONFIG !== 'undefined' ? DEFAULT_SITE_CONFIG.categories : []);
+      })()
     };
 
     const success = saveSiteConfig(siteConfig);
@@ -1235,10 +1314,198 @@
       saveCloudSiteConfig(siteConfig);
     }
 
+    populateProductCategoryDropdowns();
+    renderCategoriesTable();
+    renderProductsTable();
+
     if (success) {
       showToast('✅ All site texts, logo, and contacts saved successfully!');
     } else {
       showToast('❌ Failed to save configuration.');
+    }
+  }
+
+  // ==========================================================================
+  // COLLECTIONS & CATEGORIES MANAGER
+  // ==========================================================================
+  function getAdminCategories() {
+    if (Array.isArray(siteConfig.categories) && siteConfig.categories.length > 0) {
+      return siteConfig.categories;
+    }
+    return (typeof DEFAULT_SITE_CONFIG !== 'undefined' && Array.isArray(DEFAULT_SITE_CONFIG.categories))
+      ? JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG.categories))
+      : [
+          { id: "journals", name: "Hardcover Journals" },
+          { id: "sketchbooks", name: "Mixed Media Sketchbooks" },
+          { id: "planners", name: "Productivity Planners" },
+          { id: "spiral", name: "Spiral Notebooks" },
+          { id: "pocket", name: "Pocket Thoughtbooks" }
+        ];
+  }
+
+  function populateProductCategoryDropdowns() {
+    const cats = getAdminCategories();
+    if (editCategory) {
+      const currentVal = editCategory.value;
+      editCategory.innerHTML = cats.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+      if (currentVal && cats.some(c => c.id === currentVal)) {
+        editCategory.value = currentVal;
+      }
+    }
+    const adminCatFilter = document.getElementById('adminCategoryFilter');
+    if (adminCatFilter) {
+      const currentVal = adminCatFilter.value;
+      adminCatFilter.innerHTML = `<option value="all">All Categories</option>` +
+        cats.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+      if (currentVal && (currentVal === 'all' || cats.some(c => c.id === currentVal))) {
+        adminCatFilter.value = currentVal;
+      }
+    }
+  }
+
+  function renderCategoriesTable() {
+    if (!categoriesTableBody) return;
+    const cats = getAdminCategories();
+    siteConfig.categories = cats;
+
+    if (cats.length === 0) {
+      categoriesTableBody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 24px; color: var(--text-muted);">
+            No categories defined. Click "Add Category" above to create one.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    categoriesTableBody.innerHTML = cats.map((cat, index) => {
+      const count = productsList.filter(p => p.category === cat.id).length;
+      return `
+        <tr class="cat-edit-row" data-cat-id="${escapeHtml(cat.id)}" data-index="${index}">
+          <td>
+            <input type="text" class="admin-input cat-id-input" value="${escapeHtml(cat.id)}" style="font-family: monospace; font-size: 0.85rem;" placeholder="e.g. journals" required>
+          </td>
+          <td>
+            <input type="text" class="admin-input cat-name-input" value="${escapeHtml(cat.name)}" placeholder="e.g. Hardcover Journals" required>
+          </td>
+          <td style="text-align: center;">
+            <span class="stock-badge ${count > 0 ? 'stock-badge-in' : 'stock-badge-out'}" style="font-size: 0.8rem;">
+              ${count} ${count === 1 ? 'book' : 'books'}
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <button type="button" class="btn-table-delete" onclick="window.removeCategoryRow('${escapeHtml(cat.id)}')" title="Delete this collection category">
+              🗑️ Delete
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  window.removeCategoryRow = function (catId) {
+    const cats = getAdminCategories();
+    const count = productsList.filter(p => p.category === catId).length;
+    if (count > 0) {
+      if (!confirm(`Warning: ${count} book(s) are currently assigned to this category ("${catId}"). Are you sure you want to delete this category?`)) {
+        return;
+      }
+    } else {
+      if (!confirm(`Delete category "${catId}"?`)) {
+        return;
+      }
+    }
+
+    siteConfig.categories = cats.filter(c => c.id !== catId);
+    renderCategoriesTable();
+    populateProductCategoryDropdowns();
+    showToast(`Category removed. Click "Save Categories" to save changes.`);
+  };
+
+  async function handleSaveCategories() {
+    if (!categoriesTableBody) return;
+    const rows = categoriesTableBody.querySelectorAll('tr[data-cat-id]');
+    const updatedCategories = [];
+    const idMap = new Map();
+
+    for (const row of rows) {
+      const origId = row.dataset.catId;
+      const idInput = row.querySelector('.cat-id-input');
+      const nameInput = row.querySelector('.cat-name-input');
+      const newId = idInput ? idInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') : origId;
+      const newName = nameInput ? nameInput.value.trim() : '';
+
+      if (!newId) {
+        showToast('⚠️ Slug / ID cannot be empty.');
+        if (idInput) idInput.focus();
+        return;
+      }
+      if (!newName) {
+        showToast('⚠️ Display Title cannot be empty.');
+        if (nameInput) nameInput.focus();
+        return;
+      }
+
+      if (updatedCategories.some(c => c.id === newId)) {
+        showToast(`⚠️ Duplicate category slug "${newId}". Each slug must be unique.`);
+        return;
+      }
+
+      updatedCategories.push({ id: newId, name: newName });
+      idMap.set(origId, { id: newId, name: newName });
+    }
+
+    if (updatedCategories.length === 0) {
+      showToast('⚠️ You must have at least one category.');
+      return;
+    }
+
+    siteConfig.categories = updatedCategories;
+
+    // Synchronize category labels and re-mapped slugs across all products
+    let productsChanged = false;
+    productsList.forEach((prod) => {
+      const mapped = idMap.get(prod.category);
+      if (mapped) {
+        if (prod.category !== mapped.id || prod.categoryLabel !== mapped.name) {
+          prod.category = mapped.id;
+          prod.categoryLabel = mapped.name;
+          productsChanged = true;
+        }
+      } else {
+        const found = updatedCategories.find(c => c.id === prod.category);
+        if (found && prod.categoryLabel !== found.name) {
+          prod.categoryLabel = found.name;
+          productsChanged = true;
+        }
+      }
+    });
+
+    if (productsChanged) {
+      saveProducts(productsList);
+      if (typeof saveCloudProducts === 'function') {
+        try { await saveCloudProducts(productsList); } catch (e) { /* background */ }
+      }
+    }
+
+    const saved = saveSiteConfig(siteConfig);
+    if (typeof saveCloudSiteConfig === 'function') {
+      try {
+        await saveCloudSiteConfig(siteConfig);
+      } catch (err) {
+        console.warn('Could not save categories to cloud:', err.message);
+      }
+    }
+
+    populateProductCategoryDropdowns();
+    renderCategoriesTable();
+    renderProductsTable();
+
+    if (saved) {
+      showToast('✅ Categories and collections updated and saved successfully!');
+    } else {
+      showToast('❌ Error saving categories to storage.');
     }
   }
 
@@ -1304,7 +1571,7 @@
               <strong>₹${p.price}</strong>
               ${p.originalPrice ? `<span style="text-decoration: line-through; color: var(--text-light); font-size: 0.8rem; margin-left: 4px;">₹${p.originalPrice}</span>` : ''}
             </td>
-            <td><span style="font-size: 0.8rem; background: var(--admin-bg-body); padding: 3px 8px; border-radius: 4px;">${escapeHtml(p.categoryLabel || p.category)}</span></td>
+            <td><span style="font-size: 0.8rem; background: var(--admin-bg-body); padding: 3px 8px; border-radius: 4px;">${escapeHtml((siteConfig.categories || []).find((c) => c.id === p.category)?.name || p.categoryLabel || p.category)}</span></td>
             <td>${stockBadge}</td>
             <td>
               <div class="action-btn-row">
@@ -1322,6 +1589,7 @@
   // PRODUCT CRUD MODAL HANDLERS
   // ==========================================================================
   function openAddProductModal() {
+    populateProductCategoryDropdowns();
     productModalTitle.textContent = 'Add New Book';
     productEditForm.reset();
     editProductId.value = '';
@@ -1347,6 +1615,7 @@
     const product = productsList.find((p) => p.id === productId);
     if (!product) return;
 
+    populateProductCategoryDropdowns();
     productModalTitle.textContent = `Edit "${product.designName}"`;
     editProductId.value = product.id;
     editTitle.value = product.title || '';
@@ -1395,20 +1664,16 @@
 
     const id = editProductId.value.trim() || 'peb-' + Date.now();
     const categoryVal = editCategory.value;
-    const categoryLabels = {
-      journals: 'Hardcover Journals',
-      sketchbooks: 'Sketchbooks',
-      planners: 'Planners & Organizers',
-      spiral: 'Spiral Notebooks',
-      pocket: 'Pocket Books'
-    };
+    const cats = siteConfig.categories || (typeof DEFAULT_SITE_CONFIG !== 'undefined' ? DEFAULT_SITE_CONFIG.categories : []);
+    const foundCat = cats.find((c) => c.id === categoryVal);
+    const categoryLabel = foundCat ? foundCat.name : (categoryVal.charAt(0).toUpperCase() + categoryVal.slice(1));
 
     const newProduct = {
       id: id,
       title: editTitle.value.trim(),
       designName: editDesignName.value.trim(),
       category: categoryVal,
-      categoryLabel: categoryLabels[categoryVal] || 'Books',
+      categoryLabel: categoryLabel,
       price: Number(editPrice.value),
       originalPrice: editOriginalPrice.value ? Number(editOriginalPrice.value) : null,
       pages: Number(editPages.value),
@@ -1670,21 +1935,29 @@
         }
 
         // Action Buttons
+        const delBtnHtml = `
+          <button type="button" class="btn-order-delete" onclick="window.deleteOrderAdmin('${escapeHtml(order.id)}')" title="Delete this order permanently">
+            🗑️ Delete
+          </button>
+        `;
+
         let actionButtons = '';
         if (order.paymentStatus === 'PAID') {
           actionButtons = `
-            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
               <button type="button" class="btn-order-cancel" onclick="window.cancelOrderAdmin('${escapeHtml(order.id)}')">
                 ✕ Cancel
               </button>
+              ${delBtnHtml}
             </div>
           `;
         } else if (order.paymentStatus === 'CANCELLED') {
           actionButtons = `
-            <div style="display: flex; gap: 6px; justify-content: flex-end;">
+            <div style="display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
               <button type="button" class="btn-admin-subtle" style="font-size: 0.75rem;" onclick="window.reopenOrderAdmin('${escapeHtml(order.id)}')">
                 Re-open
               </button>
+              ${delBtnHtml}
             </div>
           `;
         } else {
@@ -1697,6 +1970,7 @@
               <button type="button" class="btn-order-cancel" onclick="window.cancelOrderAdmin('${escapeHtml(order.id)}')">
                 ✕ Cancel
               </button>
+              ${delBtnHtml}
             </div>
           `;
         }
@@ -1795,6 +2069,31 @@
       showToast(`Order ${orderId} re-opened.`);
     } catch (err) {
       showToast('Error re-opening order: ' + err.message);
+    }
+  };
+
+  window.deleteOrderAdmin = async function (orderId) {
+    if (!orderId) return;
+    const confirmDelete = confirm(
+      `🗑️ Delete Order "${orderId}" permanently?\n\n` +
+      `This will completely remove the order from the store database and cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      showToast(`Deleting Order ${orderId}...`);
+      if (typeof deleteCloudOrder === 'function') {
+        await deleteCloudOrder(orderId);
+      }
+      if (typeof getLocalOrders === 'function') {
+        const local = getLocalOrders();
+        const updated = local.filter((o) => o.id !== orderId);
+        if (typeof saveLocalOrders === 'function') saveLocalOrders(updated);
+      }
+      await loadOrders();
+      showToast(`🗑️ Order ${orderId} permanently deleted.`);
+    } catch (err) {
+      showToast('Error deleting order: ' + err.message);
     }
   };
 

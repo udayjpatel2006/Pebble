@@ -1355,10 +1355,40 @@ button {
   color: #FFFFFF;
 }
 
+.btn-order-delete {
+  background: #FFF1F2;
+  color: #BE123C;
+  border: 1px solid #FECDD3;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-order-delete:hover {
+  background: #BE123C;
+  color: #FFFFFF;
+  border-color: #BE123C;
+}
+
 .nav-badge-pending {
   background: #D97706 !important;
   color: #FFFFFF !important;
   font-weight: 700;
+}
+
+.cat-edit-row td {
+  vertical-align: middle;
+  padding: 12px 14px;
+}
+
+.cat-edit-row .admin-input {
+  margin: 0;
 }
 
 

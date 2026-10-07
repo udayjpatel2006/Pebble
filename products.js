@@ -68,7 +68,16 @@ const DEFAULT_SITE_CONFIG = {
   // UPI Payment Configuration
   merchantUpiId: "8897975552@ptyes",
   merchantUpiName: "Pebble Books",
-  merchantQrImageUrl: ""
+  merchantQrImageUrl: "",
+
+  // Collections & Categories (Editable in Admin)
+  categories: [
+    { id: "journals", name: "Hardcover Journals" },
+    { id: "sketchbooks", name: "Mixed Media Sketchbooks" },
+    { id: "planners", name: "Productivity Planners" },
+    { id: "spiral", name: "Spiral Notebooks" },
+    { id: "pocket", name: "Pocket Thoughtbooks" }
+  ]
 };
 
 const DEFAULT_PRODUCTS = [
@@ -127,7 +136,7 @@ const DEFAULT_PRODUCTS = [
     title: "Artist Mixed Media Sketchbook",
     designName: "Nordic Slate Minimalist",
     category: "sketchbooks",
-    categoryLabel: "Sketchbooks",
+    categoryLabel: "Mixed Media Sketchbooks",
     price: 649,
     originalPrice: 850,
     pages: 160,
@@ -151,7 +160,7 @@ const DEFAULT_PRODUCTS = [
     title: "Undated Productivity Planner",
     designName: "Sunburst Ochre",
     category: "planners",
-    categoryLabel: "Planners & Organizers",
+    categoryLabel: "Productivity Planners",
     price: 599,
     originalPrice: 799,
     pages: 220,
@@ -176,7 +185,7 @@ const DEFAULT_PRODUCTS = [
     title: "Pocket Thoughtbook (Set of 2)",
     designName: "Sage & Sand Duo",
     category: "pocket",
-    categoryLabel: "Pocket Books",
+    categoryLabel: "Pocket Thoughtbooks",
     price: 349,
     originalPrice: 450,
     pages: 128,
@@ -272,7 +281,7 @@ const DEFAULT_PRODUCTS = [
     title: "Masterclass Drawing Book",
     designName: "Raw Umber Earth",
     category: "sketchbooks",
-    categoryLabel: "Sketchbooks",
+    categoryLabel: "Mixed Media Sketchbooks",
     price: 749,
     originalPrice: 999,
     pages: 140,
@@ -323,12 +332,36 @@ function getSiteConfig() {
       if (!parsed.merchantUpiId || parsed.merchantUpiId === 'pebbleee17@gmail.com') {
         parsed.merchantUpiId = '8897975552@ptyes';
       }
+      if (!Array.isArray(parsed.categories) || parsed.categories.length === 0) {
+        parsed.categories = JSON.parse(JSON.stringify(DEFAULT_SITE_CONFIG.categories));
+      } else {
+        // Upgrade legacy names if present in cache
+        parsed.categories.forEach((c) => {
+          if (c.id === 'sketchbooks' && c.name === 'Sketchbooks') c.name = 'Mixed Media Sketchbooks';
+          if (c.id === 'planners' && c.name === 'Planners & Organizers') c.name = 'Productivity Planners';
+          if (c.id === 'pocket' && c.name === 'Pocket Books') c.name = 'Pocket Thoughtbooks';
+        });
+      }
       return { ...DEFAULT_SITE_CONFIG, ...parsed };
     }
   } catch (e) {
     console.warn("Could not read site config from storage", e);
   }
   return { ...DEFAULT_SITE_CONFIG };
+}
+
+function getCategories() {
+  const cfg = getSiteConfig();
+  if (Array.isArray(cfg.categories) && cfg.categories.length > 0) {
+    return cfg.categories;
+  }
+  return DEFAULT_SITE_CONFIG.categories;
+}
+
+function getCategoryLabel(categorySlug) {
+  const cats = getCategories();
+  const found = cats.find((c) => c.id === categorySlug);
+  return found ? found.name : categorySlug;
 }
 
 function saveSiteConfig(config) {

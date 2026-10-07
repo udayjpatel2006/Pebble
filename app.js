@@ -243,6 +243,32 @@
     if (catTitle) catTitle.textContent = siteConfig.catalogTitle || 'Our Books';
     if (catSubtitle) catSubtitle.textContent = siteConfig.catalogSubtitle || '';
 
+    // Dynamic Category Filter Tabs
+    if (categoryTabs) {
+      const cats = Array.isArray(siteConfig.categories) && siteConfig.categories.length > 0
+        ? siteConfig.categories
+        : (typeof DEFAULT_SITE_CONFIG !== 'undefined' ? DEFAULT_SITE_CONFIG.categories : []);
+
+      categoryTabs.innerHTML = `
+        <button class="cat-tab ${currentCategory === 'all' ? 'active' : ''}" data-category="all">All Books</button>
+        ${cats.map((c) => `
+          <button class="cat-tab ${currentCategory === c.id ? 'active' : ''}" data-category="${escapeHtml(c.id)}">${escapeHtml(c.name)}</button>
+        `).join('')}
+      `;
+    }
+
+    // Dynamic Footer Collection Links
+    const footerCollectionsList = document.getElementById('footerCollectionsList');
+    if (footerCollectionsList) {
+      const cats = Array.isArray(siteConfig.categories) && siteConfig.categories.length > 0
+        ? siteConfig.categories
+        : (typeof DEFAULT_SITE_CONFIG !== 'undefined' ? DEFAULT_SITE_CONFIG.categories : []);
+
+      footerCollectionsList.innerHTML = cats.map((c) => `
+        <li><a href="#catalog" onclick="filterCategory('${escapeHtml(c.id)}')">${escapeHtml(c.name)}</a></li>
+      `).join('');
+    }
+
     // Trust Grid Points
     if (trustGridContainer && Array.isArray(siteConfig.trustItems)) {
       const icons = [

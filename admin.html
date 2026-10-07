@@ -174,6 +174,10 @@
           <span>Products (Books)</span>
           <span class="nav-badge" id="productCountBadge">9</span>
         </button>
+        <button class="nav-tab-btn" data-tab="categoriesTab">
+          <span class="nav-tab-icon">📑</span>
+          <span>Collections / Categories</span>
+        </button>
         <button class="nav-tab-btn" data-tab="ordersTab">
           <span class="nav-tab-icon">📦</span>
           <span>Orders</span>
@@ -587,10 +591,10 @@
               <select id="adminCategoryFilter" class="admin-select">
                 <option value="all">All Categories</option>
                 <option value="journals">Hardcover Journals</option>
-                <option value="sketchbooks">Sketchbooks</option>
-                <option value="planners">Planners &amp; Organizers</option>
+                <option value="sketchbooks">Mixed Media Sketchbooks</option>
+                <option value="planners">Productivity Planners</option>
                 <option value="spiral">Spiral Notebooks</option>
-                <option value="pocket">Pocket Books</option>
+                <option value="pocket">Pocket Thoughtbooks</option>
               </select>
             </div>
           </div>
@@ -618,17 +622,65 @@
       </section>
 
       <!-- ==================================================================
+           TAB: COLLECTIONS & CATEGORIES
+           ================================================================== -->
+      <section class="admin-tab-pane" id="categoriesTab">
+        <div class="pane-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <h2>Collections &amp; Categories</h2>
+            <p>Customize the category titles and collections shown on your website filter bar, footer links, and product catalogue.</p>
+          </div>
+          <button type="button" id="addNewCategoryBtn" class="btn-admin-primary">
+            ➕ Add Category
+          </button>
+        </div>
+
+        <div class="admin-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 class="card-title" style="margin-bottom: 4px;">Store Collections</h3>
+              <p class="field-hint" style="margin: 0;">Edit display titles or slugs. Changes automatically update website tabs, footer links, and product selection.</p>
+            </div>
+            <button type="button" id="saveCategoriesBtn" class="btn-admin-primary" style="background: #16A34A; border-color: #16A34A;">
+              💾 Save Categories
+            </button>
+          </div>
+
+          <div class="admin-table-wrap" style="overflow-x: auto;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th style="width: 220px;">Slug / ID</th>
+                  <th>Display Title (Website Name)</th>
+                  <th style="width: 140px; text-align: center;">Assigned Books</th>
+                  <th style="width: 110px; text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="categoriesTableBody">
+                <!-- Rendered dynamically by admin.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================================================================
            TAB 5: ORDERS & PAYMENT VERIFICATION
            ================================================================== -->
       <section class="admin-tab-pane" id="ordersTab">
         <div class="pane-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
           <div>
             <h2>Store Orders &amp; UPI Verification</h2>
-            <p>Review customer orders, verify 12-digit UTR references against bank credits, and mark orders as Paid or Cancelled.</p>
+            <p>Review customer orders, verify 12-digit UTR references against bank credits, and mark orders as Paid, Cancelled, or Delete them.</p>
           </div>
-          <button type="button" id="refreshOrdersBtn" class="btn-admin-secondary">
-            🔄 Refresh Orders
-          </button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="refreshOrdersBtn" class="btn-admin-secondary">
+              🔄 Refresh Orders
+            </button>
+            <button type="button" id="clearCancelledOrdersBtn" class="btn-admin-secondary" style="color: #DC2626; border-color: #FECACA;">
+              🗑️ Delete Cancelled
+            </button>
+          </div>
         </div>
 
         <!-- Orders Stats / Quick Filter Chips -->
@@ -668,7 +720,7 @@
                 <th style="min-width: 170px;">Payment &amp; UTR</th>
                 <th style="min-width: 80px;">Proof</th>
                 <th style="min-width: 130px;">Status</th>
-                <th style="min-width: 180px; text-align: right;">Admin Action</th>
+                <th style="min-width: 220px; text-align: right;">Admin Action</th>
               </tr>
             </thead>
             <tbody id="adminOrdersTableBody">
@@ -759,10 +811,10 @@
             <label for="editCategory">Category *</label>
             <select id="editCategory" class="admin-select">
               <option value="journals">Hardcover Journals</option>
-              <option value="sketchbooks">Sketchbooks</option>
-              <option value="planners">Planners &amp; Organizers</option>
+              <option value="sketchbooks">Mixed Media Sketchbooks</option>
+              <option value="planners">Productivity Planners</option>
               <option value="spiral">Spiral Notebooks</option>
-              <option value="pocket">Pocket Books</option>
+              <option value="pocket">Pocket Thoughtbooks</option>
             </select>
           </div>
           <div class="form-group">

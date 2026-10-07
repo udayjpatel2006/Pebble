@@ -365,3 +365,30 @@ async function getCloudOrders() {
   return localOrders;
 }
 
+/**
+ * Delete an order permanently (Admin only action)
+ */
+async function deleteCloudOrder(orderId) {
+  if (!orderId) return false;
+
+  // 1. Remove from local storage
+  const localOrders = getLocalOrders();
+  const updatedOrders = localOrders.filter((o) => o.id !== orderId);
+  saveLocalOrders(updatedOrders);
+
+  // 2. Remove from Firestore if configured
+  if (isFirebaseConfigured && firestoreDb) {
+    try {
+      await firestoreDb.collection("orders").doc(orderId).delete();
+      console.log(`[Pebble Firebase] Order ${orderId} deleted from Firestore.`);
+    } catch (err) {
+      console.warn("[Pebble Firebase] Error deleting order from Firestore:", err.message);
+    }
+  }
+
+  return true;
+}
+
+if (typeof window !== "undefined") {
+  window.deleteCloudOrder = deleteCloudOrder;
+}
