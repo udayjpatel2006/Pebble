@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Pebble — Secure UPI Payment</title>
+  <meta name="description" content="Direct UPI payment for your Pebble Books order. Pay seamlessly via Google Pay, PhonePe, Paytm or BHIM.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --color-primary: #7C3AED;
+      --color-primary-dark: #6D28D9;
+      --color-primary-light: #F7F4FB;
+      --color-accent: #8B5CF6;
+      --color-surface: #FFFFFF;
+      --color-bg: #F7F4FB;
+      --color-text: #1F1D24;
+      --color-muted: #6B7280;
+      --color-success: #1EBE5D;
+      --border-color: #E9E3F5;
+      --shadow-card: 0 16px 40px -12px rgba(124, 58, 237, 0.18), 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .pay-card {
+      background: var(--color-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      max-width: 440px;
+      width: 100%;
+      padding: 32px 24px;
+      box-shadow: var(--shadow-card);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .brand-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(124, 58, 237, 0.2);
+    }
+
+    .pay-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: #121016;
+      margin-bottom: 6px;
+    }
+
+    .pay-subtitle {
+      color: var(--color-muted);
+      font-size: 0.88rem;
+      margin-bottom: 24px;
+      line-height: 1.45;
+    }
+
+    .amount-box {
+      background: linear-gradient(135deg, #FAF8FE 0%, #F3EDFC 100%);
+      border: 1.5px dashed var(--color-accent);
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 24px;
+    }
+
+    .amount-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--color-muted);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .amount-value {
+      font-size: 2.3rem;
+      font-weight: 800;
+      color: var(--color-primary);
+      letter-spacing: -0.5px;
+    }
+
+    .qr-container {
+      background: #FFFFFF;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--border-color);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      position: relative;
+    }
+
+    .qr-img {
+      width: 200px;
+      height: 200px;
+      display: block;
+      border-radius: 8px;
+    }
+
+    .qr-helper-text {
+      font-size: 0.82rem;
+      color: var(--color-muted);
+      margin-bottom: 20px;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .btn-pay-primary {
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+      color: #FFFFFF;
+      box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35);
+      margin-bottom: 12px;
+    }
+
+    .btn-pay-primary:hover, .btn-pay-primary:active {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(124, 58, 237, 0.45);
+    }
+
+    .btn-copy-upi {
+      background: #F3EDFC;
+      color: var(--color-primary-dark);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      margin-bottom: 12px;
+    }
+
+    .btn-copy-upi:hover, .btn-copy-upi:active {
+      background: #EAE0F9;
+    }
+
+    .upi-id-badge {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #F9F7FC;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 20px;
+      font-size: 0.88rem;
+    }
+
+    .upi-id-badge code {
+      font-family: monospace;
+      font-weight: 700;
+      color: #1F1D24;
+      font-size: 0.92rem;
+    }
+
+    .copy-icon-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .supported-apps {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px dashed var(--border-color);
+      font-size: 0.78rem;
+      color: var(--color-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .app-tag {
+      background: #F3EDFC;
+      padding: 4px 10px;
+      border-radius: 999px;
+      color: #5B21B6;
+      font-weight: 600;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      color: var(--color-muted);
+      font-size: 0.85rem;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      color: var(--color-primary);
+    }
+
+    /* Toast */
+    .pay-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      background: #121016;
+      color: #FFFFFF;
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 9999;
+      pointer-events: none;
+    }
+    .pay-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="pay-card">
+    <div class="brand-pill">
+      <span>🪨</span>
+      <span>Pebble Books &amp; Papercraft</span>
+    </div>
+
+    <h1 class="pay-title" id="displayStoreName">Secure UPI Payment</h1>
+    <p class="pay-subtitle">Pay directly using any UPI app on your phone or scan the official QR code below.</p>
+
+    <div class="amount-box">
+      <div class="amount-label">Amount Payable</div>
+      <div class="amount-value" id="displayAmount">₹0</div>
+    </div>
+
+    <!-- Official UPI QR Code -->
+    <div class="qr-container">
+      <img id="qrImage" class="qr-img" src="" alt="UPI Payment QR Code">
+    </div>
+    <div class="qr-helper-text">Scan with Google Pay, PhonePe, Paytm, or any UPI scanner</div>
+
+    <div class="upi-id-badge">
+      <span>UPI ID: <code id="displayVpa">8897975552@ptyes</code></span>
+      <button type="button" class="copy-icon-btn" id="copyVpaBtn" onclick="copyUpiId()">Copy</button>
+    </div>
+
+    <!-- Direct One-Tap Mobile Pay Button -->
+    <a href="#" id="directPayBtn" class="action-btn btn-pay-primary">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+      <span>Open in Google Pay / PhonePe</span>
+    </a>
+
+    <!-- Supported Apps -->
+    <div class="supported-apps">
+      <span>Accepted apps:</span>
+      <span class="app-tag">Google Pay</span>
+      <span class="app-tag">PhonePe</span>
+      <span class="app-tag">Paytm</span>
+      <span class="app-tag">BHIM / Cred</span>
+    </div>
+  </div>
+
+  <a href="index.html" class="back-link">← Return to Pebble Storefront</a>
+
+  <div id="payToast" class="pay-toast">UPI ID copied to clipboard!</div>
+
+  <script>
+    (function() {
+      // 1. Parse URL Parameters
+      const params = new URLSearchParams(window.location.search);
+      const vpa = params.get('pa') || '8897975552@ptyes';
+      const name = params.get('pn') || 'Pebble Books';
+      const amount = params.get('am') || '0';
+      const note = params.get('tn') || 'Pebble Order Payment';
+
+      // 2. DOM Elements
+      const displayAmount = document.getElementById('displayAmount');
+      const displayVpa = document.getElementById('displayVpa');
+      const displayStoreName = document.getElementById('displayStoreName');
+      const qrImage = document.getElementById('qrImage');
+      const directPayBtn = document.getElementById('directPayBtn');
+
+      // 3. Populate Display
+      displayAmount.textContent = '₹' + amount;
+      displayVpa.textContent = vpa;
+      if (name && name !== 'Pebble Books') {
+        displayStoreName.textContent = name;
+      }
+
+      // 4. Construct UPI Protocol URL
+      const upiUrl = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(note)}`;
+      directPayBtn.href = upiUrl;
+
+      // 5. Generate Dynamic QR Code
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUrl)}`;
+      qrImage.src = qrCodeUrl;
+
+      // 6. Mobile Auto-Trigger (Only if on mobile device)
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (isMobile && Number(amount) > 0) {
+        // Attempt seamless launch into UPI app after short view render
+        setTimeout(function() {
+          window.location.href = upiUrl;
+        }, 400);
+      }
+
+      // 7. Copy UPI ID Helper
+      window.copyUpiId = function() {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(vpa).then(showToast).catch(fallbackCopy);
+        } else {
+          fallbackCopy();
+        }
+      };
+
+      function fallbackCopy() {
+        const temp = document.createElement('textarea');
+        temp.value = vpa;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showToast();
+      }
+
+      function showToast() {
+        const toast = document.getElementById('payToast');
+        if (toast) {
+          toast.classList.add('show');
+          setTimeout(function() {
+            toast.classList.remove('show');
+          }, 2400);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

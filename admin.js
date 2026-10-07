@@ -1222,7 +1222,7 @@
       whatsappNavRedirectText: waNavRedirectInput.value.trim(),
       whatsappFooterRedirectText: waFooterRedirectInput.value.trim(),
 
-      merchantUpiId: merchantUpiInput ? merchantUpiInput.value.trim() : (siteConfig.merchantUpiId || 'pebbleee17@gmail.com'),
+      merchantUpiId: merchantUpiInput ? merchantUpiInput.value.trim() : (siteConfig.merchantUpiId || '8897975552@ptyes'),
       merchantUpiName: merchantUpiNameInput ? merchantUpiNameInput.value.trim() : (siteConfig.merchantUpiName || 'Pebble Books'),
       merchantQrImageUrl: merchantQrUrlInput ? merchantQrUrlInput.value.trim() : (siteConfig.merchantQrImageUrl || ''),
 

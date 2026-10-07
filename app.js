@@ -1335,12 +1335,40 @@
     message += `*Delivery:* ${shipping}\n`;
     message += `*Estimated Total:* ₹${grandTotal}\n`;
 
-    // Direct UPI Payment Details
-    const merchantVpa = (siteConfig.merchantUpiId || 'pebbleee17@gmail.com').trim();
+    // Direct UPI Payment Details & One-Tap Links
+    const merchantVpa = (siteConfig.merchantUpiId || '8897975552@ptyes').trim();
+    const merchantName = (siteConfig.merchantUpiName || storeBrand || 'Pebble Books').trim();
+    const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&cu=INR&tn=${encodeURIComponent('Pebble Order')}`;
+
+    // Direct QR Code Link
+    let qrImageUrl = '';
+    if (siteConfig.merchantQrImageUrl && siteConfig.merchantQrImageUrl.trim()) {
+      const rawQr = siteConfig.merchantQrImageUrl.trim();
+      if (rawQr.startsWith('http://') || rawQr.startsWith('https://')) {
+        qrImageUrl = rawQr;
+      } else if (window.location.origin && !window.location.origin.includes('file:')) {
+        qrImageUrl = `${window.location.origin}/${rawQr.replace(/^\/+/, '')}`;
+      } else {
+        qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUri)}`;
+      }
+    } else {
+      qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUri)}`;
+    }
+
+    // Direct One-Tap Web Pay Link (Opens UPI app on phone + shows QR)
+    let oneTapPayUrl = '';
+    if (window.location.origin && !window.location.origin.includes('file:')) {
+      oneTapPayUrl = `${window.location.origin}/pay.html?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&tn=${encodeURIComponent('Pebble Books Order')}`;
+    }
+
     message += `\n------------------------------------\n`;
     message += `💳 *DIRECT UPI PAYMENT DETAILS:*\n`;
     message += `• *Amount to Pay:* ₹${grandTotal}\n`;
     message += `• *UPI ID:* ${merchantVpa} (Pay via GPay, PhonePe, Paytm)\n`;
+    if (oneTapPayUrl) {
+      message += `• *⚡ Tap to Pay Directly:* ${oneTapPayUrl}\n`;
+    }
+    message += `• *📷 Scan & Pay QR Link:* ${qrImageUrl}\n`;
 
     if (extraDetails && extraDetails.name) {
       message += `\n*CUSTOMER DETAILS:*\n`;
@@ -1415,7 +1443,7 @@
     if (upiDisplayOrderId) upiDisplayOrderId.textContent = order.id;
 
     // Retrieve Merchant UPI ID
-    const merchantVpa = (siteConfig.merchantUpiId || 'pebbleee17@gmail.com').trim();
+    const merchantVpa = (siteConfig.merchantUpiId || '8897975552@ptyes').trim();
     const merchantName = (siteConfig.merchantUpiName || siteConfig.brandName || 'Pebble Books').trim();
     if (upiMerchantVpa) upiMerchantVpa.textContent = merchantVpa;
 

@@ -66,7 +66,7 @@ const DEFAULT_SITE_CONFIG = {
   footerCopyrightNotice: "© 2026 Pebble Books & Papercraft. Handcrafted with care for book lovers.",
 
   // UPI Payment Configuration
-  merchantUpiId: "pebbleee17@gmail.com",
+  merchantUpiId: "8897975552@ptyes",
   merchantUpiName: "Pebble Books",
   merchantQrImageUrl: ""
 };
@@ -314,6 +314,9 @@ function getSiteConfig() {
         if (cleanWa.length === 10) cleanWa = '91' + cleanWa;
         else if (cleanWa.length === 11 && cleanWa.startsWith('0')) cleanWa = '91' + cleanWa.slice(1);
         parsed.whatsappNumber = cleanWa || '919876543210';
+      }
+      if (!parsed.merchantUpiId || parsed.merchantUpiId === 'pebbleee17@gmail.com') {
+        parsed.merchantUpiId = '8897975552@ptyes';
       }
       return { ...DEFAULT_SITE_CONFIG, ...parsed };
     }
