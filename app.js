@@ -319,8 +319,8 @@
     } else if (clean.length === 11 && clean.startsWith('0')) {
       clean = '91' + clean.slice(1);
     }
-    if (!clean || clean.length < 8) {
-      clean = '919876543210';
+    if (!clean || clean === '919876543210' || clean.length < 8) {
+      clean = '918897975552';
     }
     return clean;
   }
@@ -328,18 +328,31 @@
   function getWhatsAppUrl(phone, text) {
     const cleanPhone = formatWhatsAppPhone(phone);
     const encodedText = encodeURIComponent(text || '');
-    // Using api.whatsapp.com/send directly avoids DNS errors ("This site can't be reached")
-    return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // Mobile devices: launches native WhatsApp app directly
+      return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+    } else {
+      // Desktop devices: opens WhatsApp Web directly without whatsapp:// scheme errors
+      return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+    }
   }
 
   function openWhatsAppLink(url) {
+    // Creating an <a> click cleanly opens in a new tab without altering current page location
     try {
-      const win = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!win || win.closed || typeof win.closed === 'undefined') {
-        window.location.href = url;
-      }
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+      }, 150);
     } catch (e) {
-      window.location.href = url;
+      window.open(url, '_blank');
     }
   }
 
@@ -1356,8 +1369,13 @@
     }
 
     // Direct One-Tap Web Pay Link (Opens UPI app on phone + shows QR)
+    // Only embed live web link if on a public hostname (never localhost, which fails on mobile devices)
     let oneTapPayUrl = '';
-    if (window.location.origin && !window.location.origin.includes('file:')) {
+    const isPublicHost = window.location.hostname &&
+                         window.location.hostname !== 'localhost' &&
+                         window.location.hostname !== '127.0.0.1' &&
+                         !window.location.hostname.startsWith('192.168.');
+    if (isPublicHost) {
       oneTapPayUrl = `${window.location.origin}/pay.html?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&tn=${encodeURIComponent('Pebble Books Order')}`;
     }
 

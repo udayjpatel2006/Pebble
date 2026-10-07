@@ -51,7 +51,7 @@ const DEFAULT_SITE_CONFIG = {
   gmailSubject: "Inquiry from Pebble Website",
   instagramHandle: "@pebble.books",
   instagramUrl: "https://instagram.com/pebble.books",
-  whatsappNumber: "919876543210",
+  whatsappNumber: "918897975552",
   whatsappNavRedirectText: "Hi Pebble! I would like to inquire about your books.",
   whatsappFooterRedirectText: "Hi Pebble! I visited your website and want to place an order.",
 
@@ -313,7 +313,12 @@ function getSiteConfig() {
         let cleanWa = String(parsed.whatsappNumber).replace(/\D/g, '');
         if (cleanWa.length === 10) cleanWa = '91' + cleanWa;
         else if (cleanWa.length === 11 && cleanWa.startsWith('0')) cleanWa = '91' + cleanWa.slice(1);
-        parsed.whatsappNumber = cleanWa || '919876543210';
+        if (cleanWa === '919876543210' || cleanWa === '9876543210' || !cleanWa) {
+          cleanWa = '918897975552';
+        }
+        parsed.whatsappNumber = cleanWa;
+      } else {
+        parsed.whatsappNumber = '918897975552';
       }
       if (!parsed.merchantUpiId || parsed.merchantUpiId === 'pebbleee17@gmail.com') {
         parsed.merchantUpiId = '8897975552@ptyes';

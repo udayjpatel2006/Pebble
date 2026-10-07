@@ -1217,7 +1217,7 @@
         let clean = waNumberInput.value.trim().replace(/\D/g, '');
         if (clean.length === 10) clean = '91' + clean;
         else if (clean.length === 11 && clean.startsWith('0')) clean = '91' + clean.slice(1);
-        return clean || '919876543210';
+        return clean || '918897975552';
       })(),
       whatsappNavRedirectText: waNavRedirectInput.value.trim(),
       whatsappFooterRedirectText: waFooterRedirectInput.value.trim(),
