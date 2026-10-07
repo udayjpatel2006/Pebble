@@ -413,6 +413,65 @@
     </div>
   </div>
 
+  <!-- WhatsApp Order Assistant Modal -->
+  <div class="modal-backdrop" id="whatsappOrderModal" aria-hidden="true">
+    <div class="modal-card whatsapp-modal-card">
+      <button class="modal-close-btn" id="closeWhatsAppModalBtn" aria-label="Close modal">&times;</button>
+      
+      <div class="whatsapp-modal-header">
+        <div class="wa-header-icon-circle">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.981.536 1.761.814 2.796.814 3.178 0 5.766-2.587 5.767-5.766.002-3.18-2.585-5.766-5.767-5.766zm3.385 8.163c-.14.394-.712.729-1.002.776-.28.046-.642.067-1.036-.059-.283-.09-.643-.223-1.121-.43-1.921-.83-3.171-2.779-3.267-2.909-.095-.129-.785-1.042-.785-1.987 0-.946.496-1.411.672-1.605.176-.194.385-.243.513-.243.129 0 .257.002.37.008.12.006.279-.046.438.334.16.381.546 1.332.594 1.43.048.098.08.212.016.34-.064.129-.096.21-.192.323-.096.113-.203.253-.29.34-.097.097-.198.203-.086.395.113.193.501.826 1.074 1.337.738.657 1.36.861 1.554.957.193.097.306.081.419-.048.113-.129.483-.563.611-.756.129-.193.258-.161.435-.096.177.064 1.124.53 1.317.627.193.097.322.145.37.225.048.08.048.467-.092.861z"/>
+          </svg>
+        </div>
+        <div class="upi-header-badge" style="background: var(--color-whatsapp-light); color: var(--color-whatsapp-dark);">WhatsApp Order Ready</div>
+        <h2 style="font-family: var(--font-serif); font-size: 1.55rem; margin: 6px 0 4px;">Order Ready for WhatsApp</h2>
+        <p style="font-size: 0.88rem; color: var(--color-text-muted); margin-bottom: 12px;">
+          We formatted your order. If WhatsApp did not open automatically, choose an option below:
+        </p>
+      </div>
+
+      <!-- Quick Actions: Direct Chat & Copy -->
+      <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap;">
+        <a id="waModalDirectLink" href="#" target="_blank" rel="noopener noreferrer" class="btn-whatsapp-checkout" style="text-decoration: none; padding: 10px 18px; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.981.536 1.761.814 2.796.814 3.178 0 5.766-2.587 5.767-5.766.002-3.18-2.585-5.766-5.767-5.766zm3.385 8.163c-.14.394-.712.729-1.002.776-.28.046-.642.067-1.036-.059-.283-.09-.643-.223-1.121-.43-1.921-.83-3.171-2.779-3.267-2.909-.095-.129-.785-1.042-.785-1.987 0-.946.496-1.411.672-1.605.176-.194.385-.243.513-.243.129 0 .257.002.37.008.12.006.279-.046.438.334.16.381.546 1.332.594 1.43.048.098.08.212.016.34-.064.129-.096.21-.192.323-.096.113-.203.253-.29.34-.097.097-.198.203-.086.395.113.193.501.826 1.074 1.337.738.657 1.36.861 1.554.957.193.097.306.081.419-.048.113-.129.483-.563.611-.756.129-.193.258-.161.435-.096.177.064 1.124.53 1.317.627.193.097.322.145.37.225.048.08.048.467-.092.861z"/>
+          </svg>
+          Open WhatsApp Chat
+        </a>
+        <button type="button" id="waModalCopyMsgBtn" class="btn-secondary" style="padding: 10px 16px; font-size: 0.88rem; background: var(--color-bg-subtle); border: 1px solid var(--color-border); cursor: pointer; border-radius: var(--radius-pill); font-weight: 600;">
+          📋 Copy Order Text
+        </button>
+      </div>
+
+      <!-- QR Code: Scan from Phone -->
+      <div class="whatsapp-qr-scan-box">
+        <div style="font-weight: 700; font-size: 0.88rem; color: var(--color-text-main); margin-bottom: 4px;">
+          📱 Shopping on Desktop? Scan with Your Phone Camera
+        </div>
+        <p style="font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 10px;">
+          Scan to start WhatsApp chat directly on your mobile with your order pre-filled.
+        </p>
+        <div class="wa-qr-frame">
+          <img id="waModalQrImg" src="" alt="WhatsApp Order QR" style="width: 170px; height: 170px; display: block; margin: 0 auto; object-fit: contain;">
+        </div>
+        <div style="margin-top: 8px; font-size: 0.82rem; color: var(--color-text-muted);">
+          WhatsApp Number: <strong>+91 8897975552</strong>
+        </div>
+      </div>
+
+      <!-- Instant UPI Scan & Pay Button -->
+      <div style="display: flex; gap: 10px; margin-top: 14px;">
+        <button type="button" id="waModalPayUpiBtn" class="btn-primary" style="flex: 1.4; padding: 12px; font-size: 0.92rem;">
+          💳 Pay ₹<span id="waModalGrandTotal">0</span> via Direct UPI QR
+        </button>
+        <button type="button" id="waModalCloseBtn" class="btn-secondary" style="flex: 0.6; padding: 12px; font-size: 0.88rem; background: var(--color-bg-subtle); border: 1px solid var(--color-border); border-radius: var(--radius-pill); cursor: pointer;">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Order Success Confirmation Modal -->
   <div class="modal-backdrop" id="successModal" aria-hidden="true">
     <div class="modal-card" style="max-width: 500px; padding: 36px; text-align: center;">
