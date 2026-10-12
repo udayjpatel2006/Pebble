@@ -321,11 +321,77 @@
   // INITIALIZATION
   // ==========================================================================
   let lastLocalProductMutationTime = 0;
+  let pendingFrontUploadPromise = null;
+  let pendingBackUploadPromise = null;
 
   async function init() {
     checkAuthentication();
     setupEventListeners();
     updateFirebaseStatusUI();
+
+    // Cross-tab BroadcastChannel sync
+    if (typeof pebbleSyncChannel !== 'undefined' && pebbleSyncChannel) {
+      pebbleSyncChannel.addEventListener('message', (event) => {
+        const msg = event.data;
+        if (!msg || !msg.type) return;
+        if (msg.type === 'PRODUCTS_UPDATED') {
+          const incoming = Array.isArray(msg.data) ? msg.data : (Array.isArray(msg.products) ? msg.products : getProducts());
+          productsList = incoming;
+          saveProducts(productsList, false);
+          renderProductsTable();
+          renderCategoriesTable();
+        } else if (msg.type === 'SITE_CONFIG_UPDATED') {
+          const incomingCfg = (msg.data && typeof msg.data === 'object')
+            ? msg.data
+            : ((msg.siteConfig && typeof msg.siteConfig === 'object') ? msg.siteConfig : getSiteConfig());
+          siteConfig = incomingCfg;
+          saveSiteConfig(siteConfig, false);
+          populateFormValues();
+          populateProductCategoryDropdowns();
+          renderCategoriesTable();
+          renderProductsTable();
+        }
+      });
+    }
+
+    // Cross-tab storage listener
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'pebble_products' || e.key === 'pebble_deleted_products') {
+        productsList = getProducts();
+        renderProductsTable();
+        renderCategoriesTable();
+      } else if (e.key === 'pebble_site_config') {
+        siteConfig = getSiteConfig();
+        populateFormValues();
+        populateProductCategoryDropdowns();
+        renderCategoriesTable();
+        renderProductsTable();
+      }
+    });
+
+    // Real-time Firestore listener
+    if (typeof subscribeToCloudUpdates === 'function') {
+      subscribeToCloudUpdates({
+        onProductsChange: (cloudProds) => {
+          if (Array.isArray(cloudProds) && Date.now() - lastLocalProductMutationTime > 1500) {
+            productsList = cloudProds;
+            saveProducts(productsList, false);
+            renderProductsTable();
+            renderCategoriesTable();
+          }
+        },
+        onConfigChange: (cloudConfig) => {
+          if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
+            siteConfig = cloudConfig;
+            saveSiteConfig(cloudConfig, false);
+            populateProductCategoryDropdowns();
+            renderCategoriesTable();
+            renderProductsTable();
+          }
+        }
+      });
+    }
+
     await loadData();
     populateFormValues();
     populateProductCategoryDropdowns();
@@ -337,60 +403,70 @@
   async function loadData() {
     const syncStartTime = Date.now();
 
-    // 1. Instant local render first (zero latency)
+    // 1. Instant local render if cached in localStorage
     siteConfig = getSiteConfig();
     productsList = getProducts();
+    const firebaseActive = typeof isFirebaseConfigured !== 'undefined' && isFirebaseConfigured;
     const catalogInit = typeof isCatalogInitialized === 'function' ? isCatalogInitialized() : false;
-    if ((!Array.isArray(productsList) || productsList.length === 0) && !catalogInit) {
+
+    if (!firebaseActive && (!Array.isArray(productsList) || productsList.length === 0) && !catalogInit) {
       productsList = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS))
         ? [...DEFAULT_PRODUCTS]
         : [];
-      saveProducts(productsList);
+      saveProducts(productsList, false);
     }
+
     populateFormValues();
     populateProductCategoryDropdowns();
     renderCategoriesTable();
     renderProductsTable();
 
-    // 2. Resilient cloud sync with generous timeout guard (15s)
-    if (typeof getCloudSiteConfig === 'function' && typeof getCloudProducts === 'function') {
-      try {
-        const withTimeout = (promise, ms = 15000) =>
-          Promise.race([
-            promise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud sync timeout')), ms))
-          ]);
+    // 2. Fast independent cloud sync (products load in ~150ms without waiting for 235KB site_config)
+    const withTimeout = (promise, ms = 15000) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud sync timeout')), ms))
+      ]);
 
-        const [configResult, prodsResult] = await Promise.allSettled([
-          withTimeout(getCloudSiteConfig(), 15000),
-          withTimeout(getCloudProducts(), 15000)
-        ]);
+    const tasks = [];
 
-        if (configResult.status === 'fulfilled' && configResult.value && typeof configResult.value === 'object') {
-          const cloudConfig = configResult.value;
-          if (Object.keys(cloudConfig).length > 0) {
-            siteConfig = cloudConfig;
-            saveSiteConfig(cloudConfig);
-            populateFormValues();
-            populateProductCategoryDropdowns();
-            renderCategoriesTable();
-          }
-        }
-
-        if (
-          prodsResult.status === 'fulfilled' &&
-          Array.isArray(prodsResult.value) &&
-          lastLocalProductMutationTime < syncStartTime
-        ) {
-          productsList = prodsResult.value;
-          saveProducts(productsList);
-          renderProductsTable();
-          renderCategoriesTable();
-        }
-      } catch (err) {
-        console.warn('[Pebble Admin] Cloud sync notice:', err.message);
-      }
+    if (typeof getCloudProducts === 'function') {
+      tasks.push(
+        withTimeout(getCloudProducts(), 15000)
+          .then((cloudProds) => {
+            if (Array.isArray(cloudProds) && lastLocalProductMutationTime < syncStartTime) {
+              productsList = cloudProds;
+              saveProducts(productsList, false);
+              renderProductsTable();
+              renderCategoriesTable();
+            }
+          })
+          .catch((err) => {
+            console.warn('[Pebble Admin] Cloud products sync notice:', err.message);
+          })
+      );
     }
+
+    if (typeof getCloudSiteConfig === 'function') {
+      tasks.push(
+        withTimeout(getCloudSiteConfig(), 15000)
+          .then((cloudConfig) => {
+            if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
+              siteConfig = cloudConfig;
+              saveSiteConfig(cloudConfig, false);
+              populateFormValues();
+              populateProductCategoryDropdowns();
+              renderCategoriesTable();
+              renderProductsTable();
+            }
+          })
+          .catch((err) => {
+            console.warn('[Pebble Admin] Cloud site_config sync notice:', err.message);
+          })
+      );
+    }
+
+    await Promise.allSettled(tasks);
   }
 
   function updateFirebaseStatusUI() {
@@ -951,7 +1027,8 @@
 
         try {
           showToast('Uploading & optimizing book cover...');
-          const uploadedUrl = await processAndUploadImage(file, 'covers');
+          pendingFrontUploadPromise = processAndUploadImage(file, 'covers');
+          const uploadedUrl = await pendingFrontUploadPromise;
           editCustomImageUrl.value = uploadedUrl;
           if (coverDesignPreviewImg) {
             coverDesignPreviewImg.src = uploadedUrl;
@@ -959,6 +1036,8 @@
           showToast('✅ Cover design loaded! Click "Save Book Details" below.');
         } catch (err) {
           showToast('Cover upload error: ' + err.message);
+        } finally {
+          pendingFrontUploadPromise = null;
         }
       });
     }
@@ -974,6 +1053,7 @@
 
     if (clearCoverImgBtn) {
       clearCoverImgBtn.addEventListener('click', () => {
+        pendingFrontUploadPromise = null;
         editCustomImageUrl.value = '';
         if (coverDesignPreviewImg) {
           coverDesignPreviewImg.src = 'assets/pebble-logo.svg';
@@ -991,7 +1071,8 @@
 
         try {
           showToast('Uploading & optimizing back cover...');
-          const uploadedUrl = await processAndUploadImage(file, 'covers');
+          pendingBackUploadPromise = processAndUploadImage(file, 'covers');
+          const uploadedUrl = await pendingBackUploadPromise;
           if (editBackImageUrl) editBackImageUrl.value = uploadedUrl;
           if (backDesignPreviewImg) {
             backDesignPreviewImg.src = uploadedUrl;
@@ -999,6 +1080,8 @@
           showToast('✅ Back cover loaded! Click "Save Book Details" below.');
         } catch (err) {
           showToast('Back cover upload error: ' + err.message);
+        } finally {
+          pendingBackUploadPromise = null;
         }
       });
     }
@@ -1014,6 +1097,7 @@
 
     if (clearBackImgBtn) {
       clearBackImgBtn.addEventListener('click', () => {
+        pendingBackUploadPromise = null;
         if (editBackImageUrl) editBackImageUrl.value = '';
         if (backDesignPreviewImg) {
           backDesignPreviewImg.src = 'assets/pebble-logo.svg';
@@ -1589,6 +1673,15 @@
 
     try {
       lastLocalProductMutationTime = Date.now();
+
+      if (pendingFrontUploadPromise) {
+        const frontResolved = await pendingFrontUploadPromise;
+        if (frontResolved && editCustomImageUrl) editCustomImageUrl.value = frontResolved;
+      }
+      if (pendingBackUploadPromise) {
+        const backResolved = await pendingBackUploadPromise;
+        if (backResolved && editBackImageUrl) editBackImageUrl.value = backResolved;
+      }
 
       const id = editProductId.value.trim() || 'peb-' + Date.now();
       const existingIndex = productsList.findIndex((p) => p.id === id);

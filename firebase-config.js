@@ -181,33 +181,30 @@ function sortCloudProductsList(products) {
 // ==========================================================================
 
 /**
- * Load all products from Firestore (respects deletions and empty catalog state)
+ * Load all products from Firestore (fast parallel query, never re-seeds deleted sample books)
  */
 async function getCloudProducts() {
   if (isFirebaseConfigured && firestoreDb) {
     try {
-      // Check site_config first for deletedProductIds & catalogInitialized metadata
       let cloudDeletedIds = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
-      let cloudCatalogInitialized = typeof isCatalogInitialized === "function" ? isCatalogInitialized() : false;
 
-      try {
-        const metaDoc = await firestoreDb.collection("settings").doc("site_config").get();
-        if (metaDoc.exists) {
-          cloudCatalogInitialized = true;
-          const metaData = metaDoc.data() || {};
-          if (Array.isArray(metaData.deletedProductIds)) {
-            cloudDeletedIds = Array.from(new Set([...cloudDeletedIds, ...metaData.deletedProductIds]));
-            if (typeof setDeletedProductIds === "function") {
-              setDeletedProductIds(cloudDeletedIds);
-            }
+      const [metaResult, snapResult] = await Promise.allSettled([
+        firestoreDb.collection("settings").doc("catalog_meta").get(),
+        firestoreDb.collection("products").get()
+      ]);
+
+      if (metaResult.status === "fulfilled" && metaResult.value && metaResult.value.exists) {
+        const metaData = metaResult.value.data() || {};
+        if (Array.isArray(metaData.deletedProductIds)) {
+          cloudDeletedIds = Array.from(new Set([...cloudDeletedIds, ...metaData.deletedProductIds]));
+          if (typeof setDeletedProductIds === "function") {
+            setDeletedProductIds(cloudDeletedIds);
           }
         }
-      } catch (metaErr) {
-        // Ignore meta read error and proceed with products query
       }
 
-      const snapshot = await firestoreDb.collection("products").get();
-      if (!snapshot.empty) {
+      if (snapResult.status === "fulfilled" && snapResult.value) {
+        const snapshot = snapResult.value;
         const cloudProducts = [];
         snapshot.forEach((doc) => {
           const data = doc.data() || {};
@@ -219,34 +216,9 @@ async function getCloudProducts() {
           localStorage.setItem("pebble_catalog_initialized", "true");
         } catch (e) {}
         return sortCloudProductsList(cloudProducts);
-      } else {
-        // Collection is empty. Only seed default books if the store has NEVER been initialized.
-        if (!cloudCatalogInitialized) {
-          console.log("[Pebble Firebase] First-time setup: seeding default books to Firestore...");
-          const defaults = typeof DEFAULT_PRODUCTS !== "undefined" ? [...DEFAULT_PRODUCTS] : [];
-          for (let i = 0; i < defaults.length; i++) {
-            const { id, ...data } = defaults[i];
-            firestoreDb
-              .collection("products")
-              .doc(id)
-              .set({ ...data, sortOrder: i })
-              .catch(() => {});
-          }
-          firestoreDb
-            .collection("settings")
-            .doc("site_config")
-            .set({ catalogInitialized: true }, { merge: true })
-            .catch(() => {});
-          return defaults;
-        }
-        // Admin intentionally deleted all books -> return empty array!
-        try {
-          localStorage.setItem("pebble_catalog_initialized", "true");
-        } catch (e) {}
-        return [];
       }
     } catch (err) {
-      console.warn("[Pebble Firebase] Firestore read notice (check rules if access denied):", err.message);
+      console.warn("[Pebble Firebase] Firestore read notice:", err.message);
     }
   }
   return typeof getProducts === "function" ? getProducts() : [];
@@ -287,15 +259,15 @@ async function saveCloudProduct(product) {
 
       await firestoreDb.collection("products").doc(id).set(payload);
 
-      // Mark catalog initialized and remove from deletedProductIds in site_config
-      const siteUpdate = {
+      // Update lightweight catalog_meta document
+      const metaUpdate = {
         catalogInitialized: true,
-        catalogUpdatedAt: Date.now()
+        updatedAt: Date.now()
       };
       if (firebase.firestore && firebase.firestore.FieldValue) {
-        siteUpdate.deletedProductIds = firebase.firestore.FieldValue.arrayRemove(id);
+        metaUpdate.deletedProductIds = firebase.firestore.FieldValue.arrayRemove(id);
       }
-      firestoreDb.collection("settings").doc("site_config").set(siteUpdate, { merge: true }).catch(() => {});
+      firestoreDb.collection("settings").doc("catalog_meta").set(metaUpdate, { merge: true }).catch(() => {});
 
       console.log(`[Pebble Firebase] Product "${product.designName}" (${id}) saved to Firestore.`);
       return true;
@@ -328,6 +300,11 @@ async function saveCloudProducts(productsList, syncDeletions = false) {
         if (deletePromises.length > 0) {
           await Promise.allSettled(deletePromises);
         }
+        await firestoreDb
+          .collection("settings")
+          .doc("catalog_meta")
+          .set({ catalogInitialized: true, deletedProductIds: [], updatedAt: Date.now() }, { merge: true })
+          .catch(() => {});
       }
 
       for (let i = 0; i < productsList.length; i++) {
@@ -355,16 +332,18 @@ async function deleteCloudProduct(productId) {
 
   if (isFirebaseConfigured && firestoreDb) {
     try {
-      await firestoreDb.collection("products").doc(productId).delete();
-
-      const siteUpdate = {
+      const metaUpdate = {
         catalogInitialized: true,
-        catalogUpdatedAt: Date.now()
+        updatedAt: Date.now()
       };
       if (firebase.firestore && firebase.firestore.FieldValue) {
-        siteUpdate.deletedProductIds = firebase.firestore.FieldValue.arrayUnion(productId);
+        metaUpdate.deletedProductIds = firebase.firestore.FieldValue.arrayUnion(productId);
       }
-      await firestoreDb.collection("settings").doc("site_config").set(siteUpdate, { merge: true }).catch(() => {});
+
+      await Promise.all([
+        firestoreDb.collection("products").doc(productId).delete(),
+        firestoreDb.collection("settings").doc("catalog_meta").set(metaUpdate, { merge: true }).catch(() => {})
+      ]);
 
       console.log(`[Pebble Firebase] Product ${productId} deleted from Firestore.`);
       return true;
@@ -384,21 +363,46 @@ function subscribeToCloudUpdates({ onProductsChange, onConfigChange } = {}) {
   if (!isFirebaseConfigured || !firestoreDb) return () => {};
 
   const unsubscribers = [];
+  let latestRawProducts = null;
+
+  const emitFilteredProducts = () => {
+    if (typeof onProductsChange !== "function" || !Array.isArray(latestRawProducts)) return;
+    const deletedIds = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
+    const filtered = latestRawProducts.filter((p) => p && !p.isDeleted && !deletedIds.includes(p.id));
+    onProductsChange(sortCloudProductsList(filtered));
+  };
 
   if (typeof onProductsChange === "function") {
     try {
+      const unsubMeta = firestoreDb
+        .collection("settings")
+        .doc("catalog_meta")
+        .onSnapshot(
+          (doc) => {
+            if (doc.exists) {
+              const data = doc.data() || {};
+              if (Array.isArray(data.deletedProductIds) && typeof setDeletedProductIds === "function") {
+                const currentDel = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
+                setDeletedProductIds(Array.from(new Set([...currentDel, ...data.deletedProductIds])));
+                emitFilteredProducts();
+              }
+            }
+          },
+          () => {}
+        );
+      unsubscribers.push(unsubMeta);
+    } catch (e) {}
+
+    try {
       const unsubProducts = firestoreDb.collection("products").onSnapshot(
         (snapshot) => {
-          const deletedIds = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
-          const liveProducts = [];
+          const raw = [];
           snapshot.forEach((doc) => {
             const data = doc.data() || {};
-            if (!data.isDeleted && !deletedIds.includes(doc.id)) {
-              liveProducts.push({ id: doc.id, ...data });
-            }
+            raw.push({ id: doc.id, ...data });
           });
-          const sorted = sortCloudProductsList(liveProducts);
-          onProductsChange(sorted);
+          latestRawProducts = raw;
+          emitFilteredProducts();
         },
         (err) => {
           console.warn("[Pebble Firebase] Live products listener notice:", err.message);
@@ -419,10 +423,6 @@ function subscribeToCloudUpdates({ onProductsChange, onConfigChange } = {}) {
           (doc) => {
             if (doc.exists) {
               const data = doc.data() || {};
-              if (Array.isArray(data.deletedProductIds) && typeof setDeletedProductIds === "function") {
-                const currentDel = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
-                setDeletedProductIds(Array.from(new Set([...currentDel, ...data.deletedProductIds])));
-              }
               const mergedConfig = {
                 ...(typeof DEFAULT_SITE_CONFIG !== "undefined" ? DEFAULT_SITE_CONFIG : {}),
                 ...data

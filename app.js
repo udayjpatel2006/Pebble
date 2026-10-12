@@ -132,23 +132,24 @@
     // 2. Setup interactive event listeners
     setupEventListeners();
 
-    // 3. Load catalog and site configuration
-    await loadData();
-
-    // 4. Instant same-browser BroadcastChannel synchronization (Admin <-> Live Storefront)
+    // 3. Instant same-browser BroadcastChannel synchronization (Admin <-> Live Storefront)
     if (typeof pebbleSyncChannel !== 'undefined' && pebbleSyncChannel) {
       pebbleSyncChannel.addEventListener('message', (event) => {
         const msg = event.data;
         if (!msg || !msg.type) return;
 
         if (msg.type === 'PRODUCTS_UPDATED') {
-          productsList = Array.isArray(msg.products) ? msg.products : getProducts();
+          const incoming = Array.isArray(msg.data) ? msg.data : (Array.isArray(msg.products) ? msg.products : getProducts());
+          productsList = incoming;
           saveProducts(productsList, false);
           syncCartWithProducts();
           renderProducts();
           updateCartUI();
         } else if (msg.type === 'SITE_CONFIG_UPDATED') {
-          siteConfig = (msg.siteConfig && typeof msg.siteConfig === 'object') ? msg.siteConfig : getSiteConfig();
+          const incomingCfg = (msg.data && typeof msg.data === 'object')
+            ? msg.data
+            : ((msg.siteConfig && typeof msg.siteConfig === 'object') ? msg.siteConfig : getSiteConfig());
+          siteConfig = incomingCfg;
           saveSiteConfig(siteConfig, false);
           applySiteConfig();
           renderProducts();
@@ -157,7 +158,7 @@
       });
     }
 
-    // 5. Cross-tab localStorage synchronization (without triggering a stale cloud re-fetch race)
+    // 4. Cross-tab localStorage synchronization
     window.addEventListener('storage', (e) => {
       if (e.key === 'pebble_cart') {
         loadCartFromStorage();
@@ -174,7 +175,7 @@
       }
     });
 
-    // 6. Real-time Firebase Cloud listener (syncs changes across devices/tabs automatically)
+    // 5. Real-time Firebase Cloud listener (syncs changes across devices/tabs automatically)
     if (typeof subscribeToCloudUpdates === 'function') {
       subscribeToCloudUpdates({
         onProductsChange: (cloudProds) => {
@@ -191,80 +192,85 @@
             siteConfig = cloudConfig;
             saveSiteConfig(cloudConfig, false);
             applySiteConfig();
-            // Also re-filter productsList if deletedProductIds changed in siteConfig
-            if (Array.isArray(cloudConfig.deletedProductIds) && cloudConfig.deletedProductIds.length > 0) {
-              const delSet = new Set(cloudConfig.deletedProductIds);
-              const beforeLen = productsList.length;
-              productsList = productsList.filter((p) => p && !delSet.has(p.id));
-              if (productsList.length !== beforeLen) {
-                saveProducts(productsList, false);
-                syncCartWithProducts();
-              }
-            }
             renderProducts();
             updateCartUI();
           }
         }
       });
     }
+
+    // 6. Load catalog and site configuration
+    await loadData();
   }
 
   async function loadData() {
-    // 1. Instant local render (Zero latency - books display immediately!)
+    // 1. Instant local render if cached in localStorage
     siteConfig = getSiteConfig();
     productsList = getProducts();
+    const firebaseActive = typeof isFirebaseConfigured !== 'undefined' && isFirebaseConfigured;
     const catalogAlreadyInit = (typeof isCatalogInitialized === 'function') && isCatalogInitialized();
-    if (!Array.isArray(productsList) || (productsList.length === 0 && !catalogAlreadyInit)) {
+
+    if (!firebaseActive && (!Array.isArray(productsList) || (productsList.length === 0 && !catalogAlreadyInit))) {
       productsList = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS))
         ? [...DEFAULT_PRODUCTS]
         : [];
       saveProducts(productsList, false);
     }
+
     applySiteConfig();
-    syncCartWithProducts();
-    renderProducts();
+    if (productsList.length > 0 || catalogAlreadyInit || !firebaseActive) {
+      syncCartWithProducts();
+      renderProducts();
+    }
     updateCartUI();
 
-    // 2. Resilient background cloud sync (15s timeout & independent settlement so neither blocks the other)
-    if (typeof getCloudSiteConfig === 'function' && typeof getCloudProducts === 'function') {
-      try {
-        const withTimeout = (promise, ms) =>
-          Promise.race([
-            promise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud sync timeout')), ms))
-          ]);
+    // 2. Fast independent cloud sync (products render immediately without waiting for 235KB site_config)
+    const withTimeout = (promise, ms = 15000) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud sync timeout')), ms))
+      ]);
 
-        const [configResult, prodsResult] = await Promise.allSettled([
-          withTimeout(getCloudSiteConfig(), 15000),
-          withTimeout(getCloudProducts(), 15000)
-        ]);
+    const tasks = [];
 
-        let hasChange = false;
-        if (configResult.status === 'fulfilled' && configResult.value && typeof configResult.value === 'object') {
-          const cloudConfig = configResult.value;
-          if (Object.keys(cloudConfig).length > 0) {
-            siteConfig = cloudConfig;
-            saveSiteConfig(cloudConfig, false);
-            applySiteConfig();
-            hasChange = true;
-          }
-        }
-
-        if (prodsResult.status === 'fulfilled' && Array.isArray(prodsResult.value)) {
-          productsList = prodsResult.value;
-          saveProducts(productsList, false);
-          syncCartWithProducts();
-          renderProducts();
-          hasChange = true;
-        }
-
-        if (hasChange) {
-          updateCartUI();
-        }
-      } catch (err) {
-        console.log('[Pebble] Local catalog active (Cloud sync offline or skipped):', err.message);
-      }
+    if (typeof getCloudProducts === 'function') {
+      tasks.push(
+        withTimeout(getCloudProducts(), 15000)
+          .then((cloudProds) => {
+            if (Array.isArray(cloudProds)) {
+              productsList = cloudProds;
+              saveProducts(productsList, false);
+              syncCartWithProducts();
+              renderProducts();
+              updateCartUI();
+            }
+          })
+          .catch((err) => {
+            console.log('[Pebble] Cloud products sync notice:', err.message);
+            renderProducts();
+          })
+      );
     }
+
+    if (typeof getCloudSiteConfig === 'function') {
+      tasks.push(
+        withTimeout(getCloudSiteConfig(), 15000)
+          .then((cloudConfig) => {
+            if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
+              siteConfig = cloudConfig;
+              saveSiteConfig(cloudConfig, false);
+              applySiteConfig();
+              renderProducts();
+              updateCartUI();
+            }
+          })
+          .catch((err) => {
+            console.log('[Pebble] Cloud site_config sync notice:', err.message);
+          })
+      );
+    }
+
+    await Promise.allSettled(tasks);
   }
 
   // Apply dynamic texts, logos, and links

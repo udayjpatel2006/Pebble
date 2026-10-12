@@ -364,6 +364,23 @@ function getCategoryLabel(categorySlug) {
   return found ? found.name : categorySlug;
 }
 
+// Storage schema version: automatically purges stale v1 localStorage cache from older deployments
+const PEBBLE_STORAGE_VERSION = "2.1.0";
+(function migrateStaleLocalStorage() {
+  try {
+    if (typeof localStorage !== "undefined") {
+      const currentVer = localStorage.getItem("pebble_storage_version");
+      if (currentVer !== PEBBLE_STORAGE_VERSION) {
+        localStorage.removeItem("pebble_products");
+        localStorage.removeItem("pebble_deleted_products");
+        localStorage.setItem("pebble_storage_version", PEBBLE_STORAGE_VERSION);
+      }
+    }
+  } catch (e) {
+    // Ignore storage access errors
+  }
+})();
+
 // Cross-tab BroadcastChannel for instant zero-latency sync between Admin and Live Storefront
 let pebbleSyncChannel = null;
 try {
@@ -377,7 +394,13 @@ try {
 function broadcastStoreSync(type, data) {
   try {
     if (pebbleSyncChannel) {
-      pebbleSyncChannel.postMessage({ type, data, timestamp: Date.now() });
+      pebbleSyncChannel.postMessage({
+        type,
+        data,
+        products: type === "PRODUCTS_UPDATED" ? data : undefined,
+        siteConfig: type === "SITE_CONFIG_UPDATED" ? data : undefined,
+        timestamp: Date.now()
+      });
     }
   } catch (e) {
     // Ignore broadcast errors
@@ -449,8 +472,20 @@ function saveSiteConfig(config, shouldBroadcast = false) {
     }
     return true;
   } catch (e) {
-    console.error("Failed to save site config", e);
-    return false;
+    try {
+      localStorage.removeItem("pebble_site_config");
+      localStorage.setItem("pebble_site_config", JSON.stringify(config));
+      if (shouldBroadcast) {
+        broadcastStoreSync("SITE_CONFIG_UPDATED", config);
+      }
+      return true;
+    } catch (retryErr) {
+      console.error("Failed to save site config", retryErr);
+      if (shouldBroadcast) {
+        broadcastStoreSync("SITE_CONFIG_UPDATED", config);
+      }
+      return false;
+    }
   }
 }
 
@@ -472,12 +507,18 @@ function getProducts() {
     return [];
   }
 
+  // When Firebase Cloud is active, do NOT flash or seed fake DEFAULT_PRODUCTS before cloud sync completes
+  if (typeof isFirebaseConfigured !== "undefined" && isFirebaseConfigured) {
+    return [];
+  }
+
   return DEFAULT_PRODUCTS.filter((item) => !deletedIds.includes(item.id)).map((item) => ({ ...item }));
 }
 
 function saveProducts(products, shouldBroadcast = false) {
   const safeList = Array.isArray(products) ? products : [];
   try {
+    localStorage.setItem("pebble_storage_version", PEBBLE_STORAGE_VERSION);
     localStorage.setItem("pebble_catalog_initialized", "true");
     localStorage.setItem("pebble_products", JSON.stringify(safeList));
     if (shouldBroadcast) {
@@ -487,8 +528,8 @@ function saveProducts(products, shouldBroadcast = false) {
   } catch (e) {
     console.warn("LocalStorage quota warning while saving products, attempting compact save:", e.message);
     try {
-      // Free up space if quota exceeded by keeping essential fields in localStorage while Firestore holds full data
       localStorage.removeItem("pebble_products");
+      localStorage.setItem("pebble_catalog_initialized", "true");
       localStorage.setItem("pebble_products", JSON.stringify(safeList));
       if (shouldBroadcast) {
         broadcastStoreSync("PRODUCTS_UPDATED", safeList);
@@ -510,6 +551,7 @@ function resetAllToDefaults() {
     localStorage.removeItem("pebble_products");
     localStorage.removeItem("pebble_deleted_products");
     localStorage.removeItem("pebble_catalog_initialized");
+    localStorage.setItem("pebble_storage_version", PEBBLE_STORAGE_VERSION);
     return true;
   } catch (e) {
     console.error("Reset failed", e);
