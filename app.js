@@ -457,15 +457,9 @@
   function getWhatsAppUrl(phone, text) {
     const cleanPhone = formatWhatsAppPhone(phone);
     const encodedText = encodeURIComponent(text || '');
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      // Mobile devices: launches native WhatsApp app directly
-      return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
-    } else {
-      // Desktop devices: opens WhatsApp Web directly without whatsapp:// scheme errors
-      return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
-    }
+    // Standard universal WhatsApp endpoint that loads cleanly on laptop/desktop and mobile
+    // without triggering web.whatsapp.com ERR_CONNECTION_CLOSED
+    return `https://api.whatsapp.com/send/?phone=${cleanPhone}&text=${encodedText}&type=phone_number&app_absent=0`;
   }
 
   function openWhatsAppLink(url) {
@@ -666,6 +660,72 @@
       submitUpiProofBtn.addEventListener('click', handleUpiReferenceSubmit);
     }
 
+    // WhatsApp Order Assistant Modal controls
+    const whatsappOrderModal = document.getElementById('whatsappOrderModal');
+    const closeWhatsAppModalBtn = document.getElementById('closeWhatsAppModalBtn');
+    const waModalCloseBtn = document.getElementById('waModalCloseBtn');
+    const waModalCopyMsgBtn = document.getElementById('waModalCopyMsgBtn');
+    const waModalPayUpiBtn = document.getElementById('waModalPayUpiBtn');
+
+    if (closeWhatsAppModalBtn) {
+      closeWhatsAppModalBtn.addEventListener('click', closeWhatsAppOrderModal);
+    }
+    if (waModalCloseBtn) {
+      waModalCloseBtn.addEventListener('click', closeWhatsAppOrderModal);
+    }
+    if (whatsappOrderModal) {
+      whatsappOrderModal.addEventListener('click', (e) => {
+        if (e.target === whatsappOrderModal) closeWhatsAppOrderModal();
+      });
+    }
+
+    if (waModalCopyMsgBtn) {
+      waModalCopyMsgBtn.addEventListener('click', () => {
+        if (!lastPreparedOrderMessage) {
+          showToast('No order text found to copy.');
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(lastPreparedOrderMessage).then(() => {
+            showToast('📋 Order details copied! Paste in WhatsApp (+91 8897975552)');
+          }).catch(() => {
+            prompt('Copy Order Details for WhatsApp (+91 8897975552):', lastPreparedOrderMessage);
+          });
+        } else {
+          prompt('Copy Order Details for WhatsApp (+91 8897975552):', lastPreparedOrderMessage);
+        }
+      });
+    }
+
+    if (waModalPayUpiBtn) {
+      waModalPayUpiBtn.addEventListener('click', () => {
+        closeWhatsAppOrderModal();
+        if (cart.length === 0) {
+          showToast('Your bag is empty.');
+          return;
+        }
+        const threshold = Number(siteConfig.freeShippingThreshold) || 799;
+        const shippingFee = Number(siteConfig.shippingCharge) || 50;
+        const subtotal = cart.reduce((acc, item) => acc + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0);
+        const grandTotal = subtotal >= threshold ? subtotal : subtotal + shippingFee;
+        const newOrder = {
+          id: 'PEB-' + Math.floor(100000 + Math.random() * 900000),
+          items: [...cart],
+          subtotal,
+          shippingFee: subtotal >= threshold ? 0 : shippingFee,
+          finalAmount: grandTotal,
+          customerName: 'Customer',
+          phone: formatWhatsAppPhone(siteConfig.whatsappNumber),
+          address: 'WhatsApp Order',
+          payMethod: 'UPI / QR Scan',
+          notes: '',
+          date: new Date().toISOString(),
+          paymentStatus: 'Pending Verification'
+        };
+        openUpiPaymentModal(newOrder);
+      });
+    }
+
     // Keyboard navigation & Discrete Admin Shortcut (Ctrl + Shift + A)
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -673,6 +733,7 @@
         closeCart();
         closeCheckoutModal();
         closeUpiPaymentModal();
+        closeWhatsAppOrderModal();
         successModal.classList.remove('open');
       } else if (e.shiftKey && (e.ctrlKey || e.metaKey) && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
@@ -1554,46 +1615,6 @@
     message += `*Delivery:* ${shipping}\n`;
     message += `*Estimated Total:* ₹${grandTotal}\n`;
 
-    // Direct UPI Payment Details & One-Tap Links
-    const merchantVpa = (siteConfig.merchantUpiId || '8897975552@ptyes').trim();
-    const merchantName = (siteConfig.merchantUpiName || storeBrand || 'Pebble Books').trim();
-    const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&cu=INR&tn=${encodeURIComponent('Pebble Order')}`;
-
-    // Direct QR Code Link
-    let qrImageUrl = '';
-    if (siteConfig.merchantQrImageUrl && siteConfig.merchantQrImageUrl.trim()) {
-      const rawQr = siteConfig.merchantQrImageUrl.trim();
-      if (rawQr.startsWith('http://') || rawQr.startsWith('https://')) {
-        qrImageUrl = rawQr;
-      } else if (window.location.origin && !window.location.origin.includes('file:')) {
-        qrImageUrl = `${window.location.origin}/${rawQr.replace(/^\/+/, '')}`;
-      } else {
-        qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUri)}`;
-      }
-    } else {
-      qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUri)}`;
-    }
-
-    // Direct One-Tap Web Pay Link (Opens UPI app on phone + shows QR)
-    // Only embed live web link if on a public hostname (never localhost, which fails on mobile devices)
-    let oneTapPayUrl = '';
-    const isPublicHost = window.location.hostname &&
-                         window.location.hostname !== 'localhost' &&
-                         window.location.hostname !== '127.0.0.1' &&
-                         !window.location.hostname.startsWith('192.168.');
-    if (isPublicHost) {
-      oneTapPayUrl = `${window.location.origin}/pay.html?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&tn=${encodeURIComponent('Pebble Books Order')}`;
-    }
-
-    message += `\n------------------------------------\n`;
-    message += `💳 *DIRECT UPI PAYMENT DETAILS:*\n`;
-    message += `• *Amount to Pay:* ₹${grandTotal}\n`;
-    message += `• *UPI ID:* ${merchantVpa} (Pay via GPay, PhonePe, Paytm)\n`;
-    if (oneTapPayUrl) {
-      message += `• *⚡ Tap to Pay Directly:* ${oneTapPayUrl}\n`;
-    }
-    message += `• *📷 Scan & Pay QR Link:* ${qrImageUrl}\n`;
-
     if (extraDetails && extraDetails.name) {
       message += `\n*CUSTOMER DETAILS:*\n`;
       message += `• *Name:* ${extraDetails.name}\n`;
@@ -1603,10 +1624,72 @@
       if (extraDetails.notes) message += `• *Special Notes:* ${extraDetails.notes}\n`;
     }
 
-    message += `\nPlease confirm availability and dispatch time. Thank you!`;
+    // Direct UPI Payment Details & One-Tap Links
+    const merchantVpa = (siteConfig.merchantUpiId || '8897975552@ptyes').trim();
+    const merchantName = (siteConfig.merchantUpiName || storeBrand || 'Pebble Books').trim();
+
+    const isPublicHost = window.location.hostname &&
+                         window.location.hostname !== 'localhost' &&
+                         window.location.hostname !== '127.0.0.1' &&
+                         !window.location.hostname.startsWith('192.168.');
+    const basePayOrigin = isPublicHost ? window.location.origin : 'https://pebble17.vercel.app';
+
+    // Clean, short URLs for both Direct Tap-to-Pay and Scan & Pay QR (never embed base64 data URIs in WhatsApp URLs)
+    const oneTapPayUrl = `${basePayOrigin}/pay.html?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&tn=${encodeURIComponent('Pebble Books Order')}`;
+    const qrImageUrl = `${basePayOrigin}/pay.html?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(merchantName)}&am=${grandTotal}&mode=qr`;
+
+    message += `\n------------------------------------\n`;
+    message += `💳 *DIRECT UPI PAYMENT DETAILS:*\n`;
+    message += `• *Amount to Pay:* ₹${grandTotal}\n`;
+    message += `• *UPI ID:* ${merchantVpa} (Pay via GPay, PhonePe, Paytm)\n`;
+    message += `• *⚡ Tap to Pay Directly:* ${oneTapPayUrl}\n`;
+    message += `• *📷 Scan & Pay QR Link:* ${qrImageUrl}\n`;
+    message += `\nComplete payment using above payment links`;
 
     const waUrl = getWhatsAppUrl(cleanPhone, message);
     openWhatsAppLink(waUrl);
+
+    // Also display the on-screen WhatsApp Assistant Modal for instant copy, scan, and UPI payment options
+    openWhatsAppOrderModal(cleanPhone, message, grandTotal, waUrl);
+  }
+
+  // ==========================================
+  // WHATSAPP ORDER ASSISTANT MODAL
+  // ==========================================
+  let lastPreparedOrderMessage = '';
+  let lastPreparedGrandTotal = 0;
+
+  function openWhatsAppOrderModal(cleanPhone, message, grandTotal, waUrl) {
+    lastPreparedOrderMessage = message;
+    lastPreparedGrandTotal = grandTotal;
+
+    const modal = document.getElementById('whatsappOrderModal');
+    if (!modal) return;
+
+    const directLink = document.getElementById('waModalDirectLink');
+    const grandTotalSpan = document.getElementById('waModalGrandTotal');
+    const qrImg = document.getElementById('waModalQrImg');
+
+    if (directLink) directLink.href = waUrl;
+    if (grandTotalSpan) grandTotalSpan.textContent = grandTotal;
+
+    if (qrImg) {
+      const storeBrand = siteConfig.brandName || 'Pebble';
+      const shortMsg = `*ORDER - ${storeBrand.toUpperCase()} BOOKS* (₹${grandTotal})\nHello! I would like to confirm my order for ₹${grandTotal}.`;
+      const phoneWaUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(shortMsg)}`;
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(phoneWaUrl)}`;
+    }
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeWhatsAppOrderModal() {
+    const modal = document.getElementById('whatsappOrderModal');
+    if (modal) {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+    }
   }
 
   // ==========================================

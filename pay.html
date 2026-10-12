@@ -123,16 +123,67 @@
     }
 
     .qr-img {
-      width: 200px;
-      height: 200px;
+      width: 220px;
+      height: 220px;
+      object-fit: contain;
       display: block;
       border-radius: 8px;
+    }
+
+    .qr-mode-tabs {
+      display: inline-flex;
+      background: #F3EDFC;
+      padding: 4px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      gap: 4px;
+    }
+
+    .qr-mode-tab {
+      border: none;
+      background: transparent;
+      color: #5B21B6;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+
+    .qr-mode-tab.active {
+      background: var(--color-primary);
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
     }
 
     .qr-helper-text {
       font-size: 0.82rem;
       color: var(--color-muted);
-      margin-bottom: 20px;
+      margin-bottom: 14px;
+    }
+
+    .qr-download-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #F3EDFC;
+      color: var(--color-primary-dark);
+      border: 1px solid rgba(124, 58, 237, 0.22);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      margin-bottom: 18px;
+      transition: all 0.2s ease;
+    }
+
+    .qr-download-btn:hover, .qr-download-btn:active {
+      background: #EAE0F9;
     }
 
     .action-btn {
@@ -269,19 +320,35 @@
       <span>Pebble Books &amp; Papercraft</span>
     </div>
 
-    <h1 class="pay-title" id="displayStoreName">Secure UPI Payment</h1>
-    <p class="pay-subtitle">Pay directly using any UPI app on your phone or scan the official QR code below.</p>
+    <h1 class="pay-title" id="displayStoreName">Scan &amp; Pay via UPI</h1>
+    <p class="pay-subtitle" id="displaySubtitle">Scan the QR code below with any UPI app or tap to open Google Pay, PhonePe, or Paytm directly.</p>
 
     <div class="amount-box">
       <div class="amount-label">Amount Payable</div>
       <div class="amount-value" id="displayAmount">₹0</div>
     </div>
 
-    <!-- Official UPI QR Code -->
-    <div class="qr-container">
-      <img id="qrImage" class="qr-img" src="" alt="UPI Payment QR Code">
+    <!-- QR Mode Switcher -->
+    <div>
+      <div class="qr-mode-tabs">
+        <button type="button" class="qr-mode-tab active" id="tabDynamicQr">📲 Amount QR</button>
+        <button type="button" class="qr-mode-tab" id="tabOfficialQr">🏦 Official Store QR</button>
+      </div>
     </div>
-    <div class="qr-helper-text">Scan with Google Pay, PhonePe, Paytm, or any UPI scanner</div>
+
+    <!-- Official UPI QR Code -->
+    <div>
+      <div class="qr-container">
+        <img id="qrImage" class="qr-img" src="" alt="UPI Payment QR Code">
+      </div>
+    </div>
+    <div class="qr-helper-text">Scan with Google Pay, PhonePe, Paytm, or save QR to scan from gallery</div>
+
+    <div>
+      <button type="button" class="qr-download-btn" id="downloadQrBtn">
+        ⬇ Save QR Image to Scan in UPI App
+      </button>
+    </div>
 
     <div class="upi-id-badge">
       <span>UPI ID: <code id="displayVpa">8897975552@ptyes</code></span>
@@ -293,7 +360,7 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
       </svg>
-      <span>Open in Google Pay / PhonePe</span>
+      <span>Open in Google Pay / PhonePe / Paytm</span>
     </a>
 
     <!-- Supported Apps -->
@@ -318,6 +385,7 @@
       const name = params.get('pn') || 'Pebble Books';
       const amount = params.get('am') || '0';
       const note = params.get('tn') || 'Pebble Order Payment';
+      const mode = params.get('mode') || '';
 
       // 2. DOM Elements
       const displayAmount = document.getElementById('displayAmount');
@@ -325,6 +393,9 @@
       const displayStoreName = document.getElementById('displayStoreName');
       const qrImage = document.getElementById('qrImage');
       const directPayBtn = document.getElementById('directPayBtn');
+      const tabDynamicQr = document.getElementById('tabDynamicQr');
+      const tabOfficialQr = document.getElementById('tabOfficialQr');
+      const downloadQrBtn = document.getElementById('downloadQrBtn');
 
       // 3. Populate Display
       displayAmount.textContent = '₹' + amount;
@@ -337,14 +408,100 @@
       const upiUrl = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(note)}`;
       directPayBtn.href = upiUrl;
 
-      // 5. Generate Dynamic QR Code
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(upiUrl)}`;
-      qrImage.src = qrCodeUrl;
+      // 5. QR Code Sources (Dynamic Order Amount QR + Official Uploaded Merchant QR)
+      const dynamicQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=12&data=${encodeURIComponent(upiUrl)}`;
+      const fallbackDynamicQrUrl = `https://quickchart.io/qr?size=400&margin=2&text=${encodeURIComponent(upiUrl)}`;
+      let officialQrUrl = 'assets/merchant-qr.jpg';
 
-      // 6. Mobile Auto-Trigger (Only if on mobile device)
+      // Also check localStorage or live Firestore for latest admin-uploaded QR image
+      try {
+        const localCfg = localStorage.getItem('pebble_site_config');
+        if (localCfg) {
+          const parsed = JSON.parse(localCfg);
+          if (parsed && parsed.merchantQrImageUrl && parsed.merchantQrImageUrl.trim()) {
+            officialQrUrl = parsed.merchantQrImageUrl.trim();
+          }
+        }
+      } catch (e) {}
+
+      fetch('https://firestore.googleapis.com/v1/projects/pebble-bb7ce/databases/(default)/documents/settings/site_config')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(doc) {
+          if (doc && doc.fields && doc.fields.merchantQrImageUrl && doc.fields.merchantQrImageUrl.stringValue) {
+            const cloudQr = doc.fields.merchantQrImageUrl.stringValue.trim();
+            if (cloudQr) {
+              officialQrUrl = cloudQr;
+              if (tabOfficialQr && tabOfficialQr.classList.contains('active')) {
+                qrImage.src = officialQrUrl;
+              }
+            }
+          }
+        })
+        .catch(function() {});
+
+      function showDynamicQr() {
+        tabDynamicQr.classList.add('active');
+        tabOfficialQr.classList.remove('active');
+        qrImage.onerror = function() {
+          if (qrImage.src !== fallbackDynamicQrUrl) {
+            qrImage.src = fallbackDynamicQrUrl;
+          } else {
+            qrImage.src = officialQrUrl;
+          }
+        };
+        qrImage.src = dynamicQrUrl;
+      }
+
+      function showOfficialQr() {
+        tabOfficialQr.classList.add('active');
+        tabDynamicQr.classList.remove('active');
+        qrImage.onerror = function() {
+          qrImage.src = dynamicQrUrl;
+        };
+        qrImage.src = officialQrUrl;
+      }
+
+      if (tabDynamicQr) tabDynamicQr.addEventListener('click', showDynamicQr);
+      if (tabOfficialQr) tabOfficialQr.addEventListener('click', showOfficialQr);
+
+      // Default to Dynamic QR (pre-fills exact order amount ₹)
+      showDynamicQr();
+
+      // Download QR Helper (for scanning from gallery on mobile)
+      if (downloadQrBtn) {
+        downloadQrBtn.addEventListener('click', async function() {
+          try {
+            const currentSrc = qrImage.src;
+            if (currentSrc.startsWith('data:')) {
+              const a = document.createElement('a');
+              a.href = currentSrc;
+              a.download = 'Pebble-UPI-QR-Rs' + amount + '.jpg';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              showToast('QR image saved! Open your UPI app -> Scan from Gallery');
+              return;
+            }
+            const res = await fetch(currentSrc);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = 'Pebble-UPI-QR-Rs' + amount + '.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 2000);
+            showToast('QR image saved! Open your UPI app -> Scan from Gallery');
+          } catch (err) {
+            window.open(qrImage.src, '_blank');
+          }
+        });
+      }
+
+      // 6. Mobile Auto-Trigger (Only when opened via "Tap to Pay Directly", NOT when opened via "Scan & Pay QR Link" mode=qr)
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile && Number(amount) > 0) {
-        // Attempt seamless launch into UPI app after short view render
+      if (isMobile && Number(amount) > 0 && mode !== 'qr') {
         setTimeout(function() {
           window.location.href = upiUrl;
         }, 400);
@@ -353,7 +510,9 @@
       // 7. Copy UPI ID Helper
       window.copyUpiId = function() {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(vpa).then(showToast).catch(fallbackCopy);
+          navigator.clipboard.writeText(vpa).then(function() {
+            showToast('UPI ID copied to clipboard!');
+          }).catch(fallbackCopy);
         } else {
           fallbackCopy();
         }
@@ -366,16 +525,17 @@
         temp.select();
         document.execCommand('copy');
         document.body.removeChild(temp);
-        showToast();
+        showToast('UPI ID copied to clipboard!');
       }
 
-      function showToast() {
+      function showToast(msg) {
         const toast = document.getElementById('payToast');
         if (toast) {
+          if (msg) toast.textContent = msg;
           toast.classList.add('show');
           setTimeout(function() {
             toast.classList.remove('show');
-          }, 2400);
+          }, 2600);
         }
       }
     })();
