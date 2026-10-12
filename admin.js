@@ -176,6 +176,22 @@
   const editInStock = document.getElementById('editInStock');
   const editBestseller = document.getElementById('editBestseller');
   const editBadge = document.getElementById('editBadge');
+  const autofillPredefinedBtn = document.getElementById('autofillPredefinedBtn');
+  const saveAsPredefinedBtn = document.getElementById('saveAsPredefinedBtn');
+  const predefinedSummaryText = document.getElementById('predefinedSummaryText');
+
+  const DEFAULT_PREDEFINED_BOOK_INFO = {
+    category: 'journals',
+    pages: 144,
+    price: 499,
+    originalPrice: 699,
+    paperGsm: '100',
+    ruling: 'Plain',
+    dimensions: 'A5',
+    coverType: 'Matte',
+    binding: 'Matte',
+    description: 'Handcrafted A5 book with 144 plain pages (100 GSM) and a durable matte finish.'
+  };
 
   // DOM Elements - Collections & Categories
   const categoriesTableBody = document.getElementById('categoriesTableBody');
@@ -1133,6 +1149,32 @@
     // Product Form Submit
     productEditForm.addEventListener('submit', handleProductFormSubmit);
 
+    // 1-Click Predefined Book Info Autofill & Save Default
+    if (autofillPredefinedBtn) {
+      autofillPredefinedBtn.addEventListener('click', () => {
+        applyPredefinedBookInfo(true);
+      });
+    }
+
+    if (saveAsPredefinedBtn) {
+      saveAsPredefinedBtn.addEventListener('click', () => {
+        saveCurrentAsPredefinedBookInfo();
+      });
+    }
+
+    // Individual Field Quick-Fill Pills
+    document.querySelectorAll('.quick-pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        const targetId = pill.getAttribute('data-target');
+        const val = pill.getAttribute('data-val');
+        const inputEl = targetId ? document.getElementById(targetId) : null;
+        if (inputEl && val !== null) {
+          inputEl.value = val;
+          flashInput(inputEl);
+        }
+      });
+    });
+
     // Orders Management Listeners
     if (refreshOrdersBtn) {
       refreshOrdersBtn.addEventListener('click', async () => {
@@ -1555,6 +1597,11 @@
           ? '<span style="display:inline-block; font-size:0.68rem; font-weight:700; background:#EDE7F8; color:#7C3AED; padding:2px 6px; border-radius:999px; margin-top:3px;">Front + Back</span>'
           : '';
 
+        const gsmClean = String(p.paperGsm || '100').toUpperCase().includes('GSM')
+          ? p.paperGsm
+          : `${p.paperGsm || '100'} GSM`;
+        const specsSub = `${p.ruling || 'Plain'} • ${gsmClean} • ${p.dimensions || 'A5'}`;
+
         return `
           <tr>
             <td>
@@ -1563,8 +1610,8 @@
               </div>
             </td>
             <td class="table-title-cell">
-              <strong>${escapeHtml(p.designName)}</strong>${badgePill}
-              <span style="color: var(--text-muted); font-size: 0.8rem;">${escapeHtml(p.title)}</span>
+              <strong>${escapeHtml(p.designName || p.title)}</strong>${badgePill}
+              <span style="color: var(--text-muted); font-size: 0.8rem;">${escapeHtml(specsSub)}</span>
               ${backCoverBadge ? `<div>${backCoverBadge}</div>` : ''}
             </td>
             <td><strong>${p.pages}</strong> pages</td>
@@ -1587,13 +1634,143 @@
   }
 
   // ==========================================================================
+  // 1-CLICK PREDEFINED BOOK INFORMATION HELPERS
+  // ==========================================================================
+  function flashInput(el) {
+    if (!el) return;
+    el.classList.remove('autofill-flash');
+    void el.offsetWidth;
+    el.classList.add('autofill-flash');
+  }
+
+  function getPredefinedBookInfo() {
+    try {
+      if (siteConfig && siteConfig.predefinedBookInfo && typeof siteConfig.predefinedBookInfo === 'object') {
+        return { ...DEFAULT_PREDEFINED_BOOK_INFO, ...siteConfig.predefinedBookInfo };
+      }
+      const saved = localStorage.getItem('pebble_predefined_book_info');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return { ...DEFAULT_PREDEFINED_BOOK_INFO, ...parsed };
+        }
+      }
+    } catch (e) {
+      // Fallback to default
+    }
+    return { ...DEFAULT_PREDEFINED_BOOK_INFO };
+  }
+
+  function updatePredefinedSummaryUI() {
+    if (!predefinedSummaryText) return;
+    const info = getPredefinedBookInfo();
+    const cats = getAdminCategories();
+    const catName = cats.find((c) => c.id === info.category)?.name || 'Hardcover Journals';
+    const gsmStr = String(info.paperGsm || '100').toUpperCase().includes('GSM')
+      ? info.paperGsm
+      : `${info.paperGsm || '100'} GSM`;
+    const mrpPart = info.originalPrice ? ` (MRP ₹${info.originalPrice})` : '';
+    predefinedSummaryText.textContent = `${catName} • ${info.pages || 144} Pages • ₹${info.price || 499}${mrpPart} • ${gsmStr} • ${info.ruling || 'Plain'} • ${info.dimensions || 'A5'} • ${info.coverType || 'Matte'}`;
+  }
+
+  function applyPredefinedBookInfo(showNotification = true) {
+    const info = getPredefinedBookInfo();
+    const cats = getAdminCategories();
+
+    if (editCategory) {
+      if (cats.some((c) => c.id === info.category)) {
+        editCategory.value = info.category;
+      } else if (cats.length > 0) {
+        editCategory.value = cats[0].id;
+      }
+      flashInput(editCategory);
+    }
+    if (editPages) {
+      editPages.value = info.pages || 144;
+      flashInput(editPages);
+    }
+    if (editPrice) {
+      editPrice.value = info.price || 499;
+      flashInput(editPrice);
+    }
+    if (editOriginalPrice) {
+      editOriginalPrice.value = info.originalPrice || '';
+      flashInput(editOriginalPrice);
+    }
+    if (editPaperGsm) {
+      editPaperGsm.value = info.paperGsm || '100';
+      flashInput(editPaperGsm);
+    }
+    if (editRuling) {
+      editRuling.value = info.ruling || 'Plain';
+      flashInput(editRuling);
+    }
+    if (editDimensions) {
+      editDimensions.value = info.dimensions || 'A5';
+      flashInput(editDimensions);
+    }
+    if (editCoverType) {
+      editCoverType.value = info.coverType || 'Matte';
+      flashInput(editCoverType);
+    }
+    if (editBinding) {
+      editBinding.value = info.binding || 'Matte';
+      flashInput(editBinding);
+    }
+    if (editDescription && (!editDescription.value.trim() || editDescription.value.trim() === DEFAULT_PREDEFINED_BOOK_INFO.description)) {
+      editDescription.value = info.description || DEFAULT_PREDEFINED_BOOK_INFO.description;
+      flashInput(editDescription);
+    }
+
+    if (editDesignName && !editDesignName.value.trim()) {
+      editDesignName.focus();
+    }
+
+    if (showNotification) {
+      showToast('⚡ Predefined book information autofilled!');
+    }
+  }
+
+  function saveCurrentAsPredefinedBookInfo() {
+    const newPredefined = {
+      category: editCategory ? editCategory.value : DEFAULT_PREDEFINED_BOOK_INFO.category,
+      pages: editPages && editPages.value ? Number(editPages.value) : DEFAULT_PREDEFINED_BOOK_INFO.pages,
+      price: editPrice && editPrice.value ? Number(editPrice.value) : DEFAULT_PREDEFINED_BOOK_INFO.price,
+      originalPrice: editOriginalPrice && editOriginalPrice.value ? Number(editOriginalPrice.value) : '',
+      paperGsm: (editPaperGsm ? editPaperGsm.value.trim() : '') || DEFAULT_PREDEFINED_BOOK_INFO.paperGsm,
+      ruling: (editRuling ? editRuling.value.trim() : '') || DEFAULT_PREDEFINED_BOOK_INFO.ruling,
+      dimensions: (editDimensions ? editDimensions.value.trim() : '') || DEFAULT_PREDEFINED_BOOK_INFO.dimensions,
+      coverType: (editCoverType ? editCoverType.value.trim() : '') || DEFAULT_PREDEFINED_BOOK_INFO.coverType,
+      binding: (editBinding ? editBinding.value.trim() : '') || DEFAULT_PREDEFINED_BOOK_INFO.binding,
+      description: (editDescription ? editDescription.value.trim() : '') || DEFAULT_PREDEFINED_BOOK_INFO.description
+    };
+
+    try {
+      localStorage.setItem('pebble_predefined_book_info', JSON.stringify(newPredefined));
+    } catch (e) {
+      console.warn('Could not save predefined book info to localStorage:', e);
+    }
+
+    siteConfig.predefinedBookInfo = newPredefined;
+    saveSiteConfig(siteConfig, false);
+    if (typeof saveCloudSiteConfig === 'function') {
+      saveCloudSiteConfig(siteConfig);
+    }
+
+    updatePredefinedSummaryUI();
+    showToast('📌 Saved current specifications as your 1-Click Predefined Default!');
+  }
+
+  // ==========================================================================
   // PRODUCT CRUD MODAL HANDLERS
   // ==========================================================================
   function openAddProductModal() {
     populateProductCategoryDropdowns();
+    updatePredefinedSummaryUI();
     productModalTitle.textContent = 'Add New Book';
     productEditForm.reset();
     editProductId.value = '';
+    if (editTitle) editTitle.value = '';
     editCustomImageUrl.value = '';
     if (coverDesignPreviewImg) {
       coverDesignPreviewImg.src = 'assets/pebble-logo.svg';
@@ -1610,6 +1787,9 @@
 
     productEditModal.classList.add('open');
     productEditModal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => {
+      if (editDesignName) editDesignName.focus();
+    }, 80);
   }
 
   window.editProduct = function (productId) {
@@ -1617,19 +1797,20 @@
     if (!product) return;
 
     populateProductCategoryDropdowns();
-    productModalTitle.textContent = `Edit "${product.designName}"`;
+    updatePredefinedSummaryUI();
+    productModalTitle.textContent = `Edit "${product.designName || product.title}"`;
     editProductId.value = product.id;
-    editTitle.value = product.title || '';
-    editDesignName.value = product.designName || '';
+    if (editTitle) editTitle.value = product.designName || product.title || '';
+    editDesignName.value = product.designName || product.title || '';
     editCategory.value = product.category || 'journals';
-    editPages.value = product.pages || 192;
+    editPages.value = product.pages || 144;
     editPrice.value = product.price || 499;
     editOriginalPrice.value = product.originalPrice || '';
-    editPaperGsm.value = product.paperGsm || '120 GSM Bleed-Proof Ivory';
-    editRuling.value = product.ruling || 'Dotted Grid';
-    editDimensions.value = product.dimensions || 'A5 (14.8 × 21.0 cm)';
-    editCoverType.value = product.coverType || 'Matte Hardcover';
-    editBinding.value = product.binding || '180° Lay-Flat Thread Bound';
+    editPaperGsm.value = product.paperGsm || '100';
+    editRuling.value = product.ruling || 'Plain';
+    editDimensions.value = product.dimensions || 'A5';
+    editCoverType.value = product.coverType || 'Matte';
+    editBinding.value = product.binding || 'Matte';
 
     editCustomImageUrl.value = product.customImageUrl || '';
     if (coverDesignPreviewImg) {
@@ -1698,28 +1879,29 @@
 
       const frontImg = editCustomImageUrl.value.trim();
       const backImg = editBackImageUrl ? editBackImageUrl.value.trim() : '';
+      const resolvedDesignName = editDesignName.value.trim();
 
       const newProduct = {
         ...(existingProd || {}),
         id: id,
-        title: editTitle.value.trim(),
-        designName: editDesignName.value.trim(),
+        title: resolvedDesignName,
+        designName: resolvedDesignName,
         category: categoryVal,
         categoryLabel: categoryLabel,
         price: Number(editPrice.value),
         originalPrice: editOriginalPrice.value ? Number(editOriginalPrice.value) : null,
         pages: Number(editPages.value),
-        paperGsm: editPaperGsm.value.trim() || '120 GSM Ivory',
-        binding: editBinding.value.trim() || 'Sewn Layflat',
-        coverType: editCoverType.value.trim() || 'Hardcover',
-        dimensions: editDimensions.value.trim() || 'A5 (14.8 × 21.0 cm)',
-        ruling: editRuling.value.trim() || 'Dotted Grid',
+        paperGsm: editPaperGsm.value.trim() || '100',
+        binding: editBinding.value.trim() || 'Matte',
+        coverType: editCoverType.value.trim() || 'Matte',
+        dimensions: editDimensions.value.trim() || 'A5',
+        ruling: editRuling.value.trim() || 'Plain',
         inStock: editInStock.checked,
         rating: existingProd && existingProd.rating ? existingProd.rating : 5.0,
         reviewsCount: existingProd && existingProd.reviewsCount ? existingProd.reviewsCount : 1,
         badge: selectedBadge,
         isBestseller: isBestseller,
-        description: editDescription.value.trim() || 'Crafted with premium archival paper.',
+        description: editDescription.value.trim() || 'Handcrafted A5 book with 144 plain pages (100 GSM) and a durable matte finish.',
         coverColor: existingProd && existingProd.coverColor ? existingProd.coverColor : '#C86446',
         patternType: existingProd && existingProd.patternType ? existingProd.patternType : 'botanical',
         customImageUrl: frontImg,

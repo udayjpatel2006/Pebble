@@ -981,28 +981,33 @@
                 </div>
               `;
 
+            const catDisplay = (siteConfig.categories || []).find((c) => c.id === product.category)?.name
+              || product.categoryLabel
+              || 'Hardcover Journals';
+
             return `
             <article class="product-card" data-id="${escapeHtml(product.id)}">
               ${mediaHtml}
 
               <div class="card-body">
-                <!-- Prominent Design Name & Number of Pages -->
+                <!-- Category & Number of Pages -->
                 <div class="design-spec-badge-row">
-                  <span class="design-name-chip" title="Cover Design Name">
-                    🎨 ${escapeHtml(product.designName || 'Artisan Design')}
+                  <span class="design-name-chip" title="Collection">
+                    ✨ ${escapeHtml(catDisplay)}
                   </span>
                   <span class="pages-count-chip" title="Total Page Count">
-                    📖 ${product.pages || 120} Pages
+                    📖 ${product.pages || 144} Pages
                   </span>
                 </div>
 
-                <h3 class="card-title">${escapeHtml(product.title || 'Handcrafted Book')}</h3>
+                <h3 class="card-title">${escapeHtml(product.designName || product.title || 'Handcrafted Book')}</h3>
                 <div class="card-design-subtitle">Artisan Edition • ${escapeHtml(dimText)}</div>
 
                 <!-- Mini specs chips -->
                 <div class="card-specs-mini">
                   <span class="spec-mini-item">${escapeHtml(product.ruling || 'Plain')}</span>
                   <span class="spec-mini-item">${escapeHtml(gsmText)} GSM</span>
+                  ${product.coverType ? `<span class="spec-mini-item">${escapeHtml(product.coverType)}</span>` : ''}
                 </div>
 
                 <!-- Card Price & Add to Bag -->
@@ -1014,7 +1019,7 @@
                     </div>
                   </div>
 
-                  <button type="button" class="btn-add-cart" onclick="event.stopPropagation(); addToCart('${escapeHtml(product.id)}', 1, event);" aria-label="Add ${escapeHtml(product.title || '')} to bag">
+                  <button type="button" class="btn-add-cart" onclick="event.stopPropagation(); addToCart('${escapeHtml(product.id)}', 1, event);" aria-label="Add ${escapeHtml(product.designName || product.title || '')} to bag">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                       <path d="M12 5v14M5 12h14"></path>
                     </svg>
@@ -1163,15 +1168,22 @@
         </div>
       `;
 
+    const qvCatDisplay = (siteConfig.categories || []).find((c) => c.id === product.category)?.name
+      || product.categoryLabel
+      || 'Hardcover Journals';
+    const qvGsmDisplay = String(product.paperGsm || '100').toUpperCase().includes('GSM')
+      ? product.paperGsm
+      : `${product.paperGsm || '100'} GSM`;
+
     quickViewContent.innerHTML = `
       ${artSideHtml}
 
       <div class="quick-view-details-side">
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
-          <h2 class="modal-product-title" style="margin-bottom: 0;">${escapeHtml(product.title)}</h2>
+          <h2 class="modal-product-title" style="margin-bottom: 0;">${escapeHtml(product.designName || product.title)}</h2>
           ${badgeText ? `<span class="product-badge ${badgeClass}" style="position: static; font-size: 0.72rem; padding: 3px 10px;">${escapeHtml(badgeText)}</span>` : ''}
         </div>
-        <div class="modal-design-label">Cover Design: ${escapeHtml(product.designName)}</div>
+        <div class="modal-design-label">${escapeHtml(qvCatDisplay)} • ${escapeHtml(product.dimensions || 'A5')}</div>
         
         <div class="price-box" style="margin-bottom: 16px;">
           <div class="price-main" style="font-size: 1.6rem;">
@@ -1190,19 +1202,19 @@
           <tbody>
             <tr>
               <td class="spec-key">Design Name</td>
-              <td class="spec-val" style="color: var(--color-primary); font-weight:700;">${escapeHtml(product.designName)}</td>
+              <td class="spec-val" style="color: var(--color-primary); font-weight:700;">${escapeHtml(product.designName || product.title)}</td>
             </tr>
             <tr>
               <td class="spec-key">Number of Pages</td>
-              <td class="spec-val" style="font-weight:700;">${product.pages} Pages</td>
+              <td class="spec-val" style="font-weight:700;">${product.pages || 144} Pages</td>
             </tr>
             <tr>
               <td class="spec-key">Paper Quality</td>
-              <td class="spec-val">${escapeHtml(product.paperGsm || 'Archival Quality')}</td>
+              <td class="spec-val">${escapeHtml(qvGsmDisplay)}</td>
             </tr>
             <tr>
               <td class="spec-key">Page Ruling</td>
-              <td class="spec-val">${escapeHtml(product.ruling || 'Blank')}</td>
+              <td class="spec-val">${escapeHtml(product.ruling || 'Plain')}</td>
             </tr>
             <tr>
               <td class="spec-key">Dimensions &amp; Size</td>
@@ -1210,11 +1222,11 @@
             </tr>
             <tr>
               <td class="spec-key">Cover Finish</td>
-              <td class="spec-val">${escapeHtml(product.coverType || 'Hardcover')}</td>
+              <td class="spec-val">${escapeHtml(product.coverType || 'Matte')}</td>
             </tr>
             <tr>
               <td class="spec-key">Binding Type</td>
-              <td class="spec-val">${escapeHtml(product.binding || 'Thread Bound')}</td>
+              <td class="spec-val">${escapeHtml(product.binding || 'Matte')}</td>
             </tr>
             <tr>
               <td class="spec-key">Stock Availability</td>
@@ -1256,7 +1268,7 @@
     const product = (currentQuickViewProductId && productsList.find((p) => p.id === currentQuickViewProductId))
       || productsList.find((p) => {
         const titleEl = document.querySelector('.modal-product-title');
-        return titleEl && p.title === titleEl.textContent;
+        return titleEl && (p.designName === titleEl.textContent || p.title === titleEl.textContent);
       });
     if (product && btnTotal) {
       btnTotal.textContent = (Number(product.price) || 0) * quickViewQuantity;
@@ -1294,8 +1306,8 @@
     } else {
       cart.push({
         id: product.id,
-        title: product.title,
-        designName: product.designName,
+        title: product.designName || product.title,
+        designName: product.designName || product.title,
         pages: product.pages,
         price: Number(product.price) || 0,
         coverColor: product.coverColor,
@@ -1308,7 +1320,7 @@
 
     saveCartToStorage();
     updateCartUI();
-    showToast(`Added "${product.designName}" (${product.pages} pages) to bag!`);
+    showToast(`Added "${product.designName || product.title}" (${product.pages} pages) to bag!`);
   };
 
   window.updateCartQty = function (productId, delta) {
@@ -1383,15 +1395,14 @@
               ${item.customImageUrl 
                 ? `<img src="${item.customImageUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;" alt="thumb">`
                 : `<div style="width: 44px; height: 60px; background: ${item.coverColor || '#C86446'}; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center; color: #FFF; font-size: 0.65rem; font-weight: 700; text-align: center; padding: 2px;">
-                    ${item.pages || 120}p
+                    ${item.pages || 144}p
                   </div>`
               }
             </div>
 
             <div class="cart-item-info">
-              <div class="cart-item-title">${escapeHtml(item.title)}</div>
-              <div class="cart-item-design">Design: ${escapeHtml(item.designName)}</div>
-              <div class="cart-item-pages">${item.pages} Pages</div>
+              <div class="cart-item-title">${escapeHtml(item.designName || item.title)}</div>
+              <div class="cart-item-pages">${item.pages || 144} Pages</div>
 
               <div class="cart-item-row-controls">
                 <div class="qty-counter" style="padding: 2px;">
@@ -1471,8 +1482,7 @@
     cart.forEach((item, idx) => {
       const itemQty = Number(item.quantity) || 1;
       const itemPrice = Number(item.price) || 0;
-      message += `${idx + 1}. *${item.title}*\n`;
-      message += `   • *Design:* ${item.designName}\n`;
+      message += `${idx + 1}. *${item.designName || item.title}*\n`;
       message += `   • *Pages:* ${item.pages} Pages\n`;
       message += `   • *Qty:* ${itemQty} × ₹${itemPrice} = ₹${itemQty * itemPrice}\n\n`;
     });

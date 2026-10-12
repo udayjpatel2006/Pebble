@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pebble — Store Admin Panel &amp; CMS</title>
   <meta name="description" content="Manage your Pebble bookstore website, customize logo, edit all texts, contact links, and manage products.">
-  <link rel="stylesheet" href="admin.css?v=1.0.5">
+  <link rel="stylesheet" href="admin.css?v=2.2.0">
 </head>
 <body>
 
@@ -584,7 +584,7 @@
         <div class="admin-card" style="padding: 16px 20px;">
           <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 240px;">
-              <input type="text" id="adminProductSearch" class="admin-input" placeholder="🔍 Search by book title, design name, or pages...">
+              <input type="text" id="adminProductSearch" class="admin-input" placeholder="🔍 Search by design name, category, or pages...">
             </div>
             <!-- Category filters hidden as requested; can be enabled anytime by removing display: none -->
             <div style="min-width: 180px; display: none;" id="adminCategoryFilterWrap">
@@ -606,7 +606,7 @@
             <thead>
               <tr>
                 <th style="width: 70px;">Cover</th>
-                <th>Design Name &amp; Title</th>
+                <th>Design Name</th>
                 <th>Pages</th>
                 <th>Price (₹)</th>
                 <th>Category</th>
@@ -788,22 +788,39 @@
   <div class="admin-modal-backdrop" id="productEditModal" aria-hidden="true">
     <div class="admin-modal-card">
       <div class="modal-head">
-        <h3 id="productModalTitle">Edit Book Details</h3>
+        <h3 id="productModalTitle">Add New Book</h3>
         <button type="button" id="closeProductModalBtn" class="modal-close-x">&times;</button>
       </div>
 
       <form id="productEditForm" class="product-edit-form">
         <input type="hidden" id="editProductId">
+        <input type="hidden" id="editTitle">
 
-        <div class="admin-grid-2">
-          <div class="form-group">
-            <label for="editTitle">Book Title *</label>
-            <input type="text" id="editTitle" class="admin-input" placeholder="e.g. Artisan Hardbound Journal" required>
+        <!-- 1-CLICK PREDEFINED BOOK INFORMATION AUTOFILL -->
+        <div class="predefined-autofill-banner" id="predefinedAutofillBanner">
+          <div class="predefined-banner-top">
+            <div class="predefined-banner-info">
+              <div class="predefined-banner-title">
+                ⚡ Predefined Book Information (1-Click Autofill)
+              </div>
+              <div class="predefined-banner-summary" id="predefinedSummaryText">
+                Hardcover Journals • 144 Pages • ₹499 (MRP ₹699) • 100 GSM • Plain • A5 • Matte
+              </div>
+            </div>
+            <div class="predefined-banner-actions">
+              <button type="button" id="autofillPredefinedBtn" class="btn-autofill-predefined" title="Click to autofill all standard book specifications">
+                ⚡ Click to Autofill Info
+              </button>
+              <button type="button" id="saveAsPredefinedBtn" class="btn-save-predefined" title="Save current form specifications as the new predefined default for future books">
+                📌 Save Current as Default
+              </button>
+            </div>
           </div>
-          <div class="form-group">
-            <label for="editDesignName">Design Name *</label>
-            <input type="text" id="editDesignName" class="admin-input" placeholder="e.g. Terracotta Botanica" required>
-          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editDesignName">Design Name *</label>
+          <input type="text" id="editDesignName" class="admin-input" placeholder="e.g. Terracotta Botanica" required>
         </div>
 
         <div class="admin-grid-3">
@@ -819,11 +836,21 @@
           </div>
           <div class="form-group">
             <label for="editPages">Number of Pages *</label>
-            <input type="number" id="editPages" class="admin-input" placeholder="e.g. 192" min="16" max="1000" required>
+            <input type="number" id="editPages" class="admin-input" placeholder="e.g. 144" min="16" max="1000" required>
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editPages" data-val="144">144</button>
+              <button type="button" class="quick-pill" data-target="editPages" data-val="192">192</button>
+              <button type="button" class="quick-pill" data-target="editPages" data-val="200">200</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="editPrice">Selling Price (₹) *</label>
             <input type="number" id="editPrice" class="admin-input" placeholder="e.g. 499" min="1" required>
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editPrice" data-val="299">₹299</button>
+              <button type="button" class="quick-pill" data-target="editPrice" data-val="399">₹399</button>
+              <button type="button" class="quick-pill" data-target="editPrice" data-val="499">₹499</button>
+            </div>
           </div>
         </div>
 
@@ -831,29 +858,59 @@
           <div class="form-group">
             <label for="editOriginalPrice">Original Price (₹)</label>
             <input type="number" id="editOriginalPrice" class="admin-input" placeholder="e.g. 699">
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editOriginalPrice" data-val="499">₹499</button>
+              <button type="button" class="quick-pill" data-target="editOriginalPrice" data-val="599">₹599</button>
+              <button type="button" class="quick-pill" data-target="editOriginalPrice" data-val="699">₹699</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="editPaperGsm">Paper Quality &amp; GSM</label>
-            <input type="text" id="editPaperGsm" class="admin-input" placeholder="e.g. 120 GSM Bleed-Proof Ivory">
+            <input type="text" id="editPaperGsm" class="admin-input" placeholder="e.g. 100">
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editPaperGsm" data-val="100">100</button>
+              <button type="button" class="quick-pill" data-target="editPaperGsm" data-val="120">120</button>
+              <button type="button" class="quick-pill" data-target="editPaperGsm" data-val="160">160</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="editRuling">Ruling Style</label>
-            <input type="text" id="editRuling" class="admin-input" placeholder="e.g. Dotted Grid (5mm)">
+            <input type="text" id="editRuling" class="admin-input" placeholder="e.g. Plain">
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editRuling" data-val="Plain">Plain</button>
+              <button type="button" class="quick-pill" data-target="editRuling" data-val="Ruled">Ruled</button>
+              <button type="button" class="quick-pill" data-target="editRuling" data-val="Dotted">Dotted</button>
+            </div>
           </div>
         </div>
 
         <div class="admin-grid-3">
           <div class="form-group">
             <label for="editDimensions">Dimensions</label>
-            <input type="text" id="editDimensions" class="admin-input" placeholder="e.g. A5 (14.8 × 21.0 cm)">
+            <input type="text" id="editDimensions" class="admin-input" placeholder="e.g. A5">
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editDimensions" data-val="A5">A5</button>
+              <button type="button" class="quick-pill" data-target="editDimensions" data-val="B5">B5</button>
+              <button type="button" class="quick-pill" data-target="editDimensions" data-val="A4">A4</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="editCoverType">Cover Finish</label>
-            <input type="text" id="editCoverType" class="admin-input" placeholder="e.g. Matte Hardcover with Gold Foil">
+            <input type="text" id="editCoverType" class="admin-input" placeholder="e.g. Matte">
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editCoverType" data-val="Matte">Matte</button>
+              <button type="button" class="quick-pill" data-target="editCoverType" data-val="Glossy">Glossy</button>
+              <button type="button" class="quick-pill" data-target="editCoverType" data-val="Hardcover">Hardcover</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="editBinding">Binding Method</label>
-            <input type="text" id="editBinding" class="admin-input" placeholder="e.g. Lay-Flat Smyth Sewn">
+            <input type="text" id="editBinding" class="admin-input" placeholder="e.g. Matte">
+            <div class="quick-fill-pills">
+              <button type="button" class="quick-pill" data-target="editBinding" data-val="Matte">Matte</button>
+              <button type="button" class="quick-pill" data-target="editBinding" data-val="Hardbound">Hardbound</button>
+              <button type="button" class="quick-pill" data-target="editBinding" data-val="Spiral">Spiral</button>
+            </div>
           </div>
         </div>
 
@@ -1010,8 +1067,8 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js?v=2.1.0"></script>
-  <script src="products.js?v=2.1.0"></script>
-  <script src="admin.js?v=2.1.0"></script>
+  <script src="firebase-config.js?v=2.2.0"></script>
+  <script src="products.js?v=2.2.0"></script>
+  <script src="admin.js?v=2.2.0"></script>
 </body>
 </html>
