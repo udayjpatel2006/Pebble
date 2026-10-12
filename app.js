@@ -700,69 +700,147 @@
   function initProductCardGestures() {
     let touchStartX = 0;
     let touchStartY = 0;
+    let lastDeltaX = 0;
+    let lastDeltaY = 0;
     let activeSlider = null;
+    let activeQvContainer = null;
     let isHorizontalSwipe = false;
     let isVerticalScroll = false;
 
     let hasJustSwiped = false;
 
+    function finishTouchGesture(e) {
+      if (activeQvContainer) {
+        const endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : (touchStartX + lastDeltaX);
+        const endY = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientY : (touchStartY + lastDeltaY);
+        const dx = endX - touchStartX;
+        const dy = endY - touchStartY;
+        if (Math.abs(dx) > 18 && Math.abs(dx) >= Math.abs(dy) && typeof window.setQuickViewSlide === 'function') {
+          if (dx < -18) window.setQuickViewSlide('back');
+          else if (dx > 18) window.setQuickViewSlide('front');
+        }
+        activeQvContainer = null;
+      }
+
+      if (!activeSlider) return;
+
+      const track = activeSlider.querySelector('.card-slider-track');
+      if (track) {
+        track.style.transition = '';
+      }
+
+      const currentActive = parseInt(activeSlider.getAttribute('data-active') || '0', 10);
+      const endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : (touchStartX + lastDeltaX);
+      const endY = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientY : (touchStartY + lastDeltaY);
+      const finalDeltaX = endX - touchStartX;
+      const finalDeltaY = endY - touchStartY;
+
+      const didSwipeHorizontally =
+        isHorizontalSwipe ||
+        (Math.abs(finalDeltaX) > 16 && Math.abs(finalDeltaX) >= Math.abs(finalDeltaY));
+
+      if (didSwipeHorizontally) {
+        hasJustSwiped = true;
+        setTimeout(() => { hasJustSwiped = false; }, 320);
+
+        if (finalDeltaX < -16) {
+          // Swiped Left -> Show Back Cover
+          setProductSliderIndex(activeSlider, 1);
+        } else if (finalDeltaX > 16) {
+          // Swiped Right -> Show Front Cover
+          setProductSliderIndex(activeSlider, 0);
+        } else {
+          setProductSliderIndex(activeSlider, currentActive);
+        }
+      } else {
+        setProductSliderIndex(activeSlider, currentActive);
+      }
+
+      activeSlider = null;
+      isHorizontalSwipe = false;
+      isVerticalScroll = false;
+      lastDeltaX = 0;
+      lastDeltaY = 0;
+    }
+
     // Mobile touch gestures
     document.addEventListener('touchstart', (e) => {
-      const slider = e.target.closest('.card-image-slider');
+      if (!e.touches || !e.touches[0]) return;
+      if (e.target.closest('.slider-dot, .btn-add-cart')) return;
+
+      const qvArt = e.target.closest('#quickViewArtContainer');
+      if (qvArt) {
+        activeQvContainer = qvArt;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        lastDeltaX = 0;
+        lastDeltaY = 0;
+        return;
+      }
+
+      const mediaWrap = e.target.closest('.card-image-slider, .card-media.has-slider');
+      const slider = mediaWrap
+        ? (mediaWrap.classList.contains('card-image-slider') ? mediaWrap : mediaWrap.querySelector('.card-image-slider'))
+        : null;
       if (!slider) return;
-      if (e.target.closest('.quick-view-overlay-btn, .slider-dot')) return;
 
       activeSlider = slider;
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
+      lastDeltaX = 0;
+      lastDeltaY = 0;
       isHorizontalSwipe = false;
       isVerticalScroll = false;
     }, { passive: true });
 
     document.addEventListener('touchmove', (e) => {
+      if (!e.touches || !e.touches[0]) return;
+
+      if (activeQvContainer) {
+        lastDeltaX = e.touches[0].clientX - touchStartX;
+        lastDeltaY = e.touches[0].clientY - touchStartY;
+        return;
+      }
+
       if (!activeSlider || isVerticalScroll) return;
 
       const currentX = e.touches[0].clientX;
       const currentY = e.touches[0].clientY;
       const deltaX = currentX - touchStartX;
       const deltaY = currentY - touchStartY;
+      lastDeltaX = deltaX;
+      lastDeltaY = deltaY;
 
       if (!isHorizontalSwipe && !isVerticalScroll) {
-        if (Math.abs(deltaY) > 8 && Math.abs(deltaY) >= Math.abs(deltaX)) {
-          // User is scrolling the page vertically -> allow natural scroll without interception
-          isVerticalScroll = true;
-          return;
-        }
-        if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (Math.abs(deltaX) > 4 && Math.abs(deltaX) >= Math.abs(deltaY) * 0.7) {
           // User is swiping book image horizontally
           isHorizontalSwipe = true;
+        } else if (Math.abs(deltaY) > 14 && Math.abs(deltaY) > Math.abs(deltaX) * 1.4) {
+          // User is scrolling the page vertically -> allow natural scroll
+          isVerticalScroll = true;
+          return;
         }
       }
 
       if (isHorizontalSwipe) {
         if (e.cancelable) e.preventDefault();
+
+        // Live finger-follow drag feedback on the slider track
+        const track = activeSlider.querySelector('.card-slider-track');
+        if (track) {
+          const currentActive = parseInt(activeSlider.getAttribute('data-active') || '0', 10);
+          const sliderWidth = activeSlider.offsetWidth || 160;
+          const basePercent = currentActive === 1 ? -50 : 0;
+          const dragPercent = (deltaX / (sliderWidth * 2)) * 100;
+          const nextPercent = Math.max(-53, Math.min(3, basePercent + dragPercent));
+          track.style.transition = 'none';
+          track.style.transform = `translateX(${nextPercent}%)`;
+        }
       }
     }, { passive: false });
 
-    document.addEventListener('touchend', (e) => {
-      if (!activeSlider) return;
-      if (isHorizontalSwipe) {
-        hasJustSwiped = true;
-        setTimeout(() => { hasJustSwiped = false; }, 250);
-        const touchEndX = e.changedTouches[0].clientX;
-        const deltaX = touchEndX - touchStartX;
-        if (deltaX < -24) {
-          // Swiped Left -> Show Back Cover
-          setProductSliderIndex(activeSlider, 1);
-        } else if (deltaX > 24) {
-          // Swiped Right -> Show Front Cover
-          setProductSliderIndex(activeSlider, 0);
-        }
-      }
-      activeSlider = null;
-      isHorizontalSwipe = false;
-      isVerticalScroll = false;
-    }, { passive: true });
+    document.addEventListener('touchend', finishTouchGesture, { passive: true });
+    document.addEventListener('touchcancel', finishTouchGesture, { passive: true });
 
     // Desktop mouse drag gestures
     let mouseStartX = 0;
@@ -773,7 +851,7 @@
       if (e.button !== 0) return;
       const slider = e.target.closest('.card-image-slider');
       if (!slider) return;
-      if (e.target.closest('.quick-view-overlay-btn, .slider-dot')) return;
+      if (e.target.closest('.slider-dot')) return;
 
       mouseActiveSlider = slider;
       mouseStartX = e.clientX;
@@ -795,9 +873,9 @@
         hasJustSwiped = true;
         setTimeout(() => { hasJustSwiped = false; }, 250);
         const deltaX = e.clientX - mouseStartX;
-        if (deltaX < -24) {
+        if (deltaX < -20) {
           setProductSliderIndex(mouseActiveSlider, 1);
-        } else if (deltaX > 24) {
+        } else if (deltaX > 20) {
           setProductSliderIndex(mouseActiveSlider, 0);
         }
       }
@@ -816,8 +894,6 @@
       if (e.target.closest('.btn-add-cart')) return;
       // 3. Ignore clicks on carousel dots (handled by switchProductSlide)
       if (e.target.closest('.slider-dot')) return;
-      // 4. Ignore clicks on Quick Specs button (already handled by inline onclick)
-      if (e.target.closest('.quick-view-overlay-btn')) return;
 
       const card = e.target.closest('.product-card');
       if (card) {
@@ -938,7 +1014,7 @@
               ? `
                 <div class="card-media has-slider">
                   ${badgeHtml}
-                  <div class="card-image-slider" data-product-id="${escapeHtml(product.id)}" data-active="0" title="Swipe to view front / back page">
+                  <div class="card-image-slider" data-product-id="${escapeHtml(product.id)}" data-active="0" title="Swipe left to view back page">
                     <div class="card-slider-track">
                       <div class="card-slide card-slide-front">
                         <div class="card-media-vector">
@@ -956,13 +1032,6 @@
                       <button type="button" class="slider-dot" data-slide="1" aria-label="View back page" onclick="switchProductSlide(event, '${escapeHtml(product.id)}', 1)"></button>
                     </div>
                   </div>
-                  <button class="quick-view-overlay-btn" onclick="openQuickView('${escapeHtml(product.id)}')">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    Quick Specs
-                  </button>
                 </div>
               `
               : `
@@ -971,13 +1040,6 @@
                   <div class="card-media-vector">
                     ${coverSvgHtml}
                   </div>
-                  <button class="quick-view-overlay-btn" onclick="openQuickView('${escapeHtml(product.id)}')">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    Quick Specs
-                  </button>
                 </div>
               `;
 

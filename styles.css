@@ -937,37 +937,7 @@ img, svg {
 }
 
 .quick-view-overlay-btn {
-  position: absolute;
-  bottom: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--color-text-main);
-  backdrop-filter: blur(4px);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  opacity: 0;
-  transform: translateY(8px);
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  z-index: 4;
-}
-
-.product-card:hover .quick-view-overlay-btn {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.card-media.has-slider .quick-view-overlay-btn {
-  bottom: 26px;
-}
-
-.quick-view-overlay-btn:hover {
-  background: var(--color-primary);
-  color: #fff;
+  display: none !important;
 }
 
 /* Book Cover Custom Image & Back Cover image styling */
@@ -982,6 +952,8 @@ img, svg {
   box-shadow: 0 10px 22px rgba(25, 23, 20, 0.18);
   position: relative;
   background: #FAF7F2;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .book-cover-custom-img img {
@@ -989,6 +961,10 @@ img, svg {
   height: 100%;
   object-fit: contain;
   display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* Quick View Toggle for Front / Back */
@@ -2135,18 +2111,8 @@ img, svg {
     top: 8px;
     left: 8px;
   }
-  /* Show quick specs button on touch/mobile devices for instant access */
   .quick-view-overlay-btn {
-    opacity: 0.95;
-    transform: none;
-    bottom: 8px;
-    font-size: 0.72rem;
-    padding: 4px 10px;
-    background: #FFFFFF;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  }
-  .card-media.has-slider .quick-view-overlay-btn {
-    bottom: 22px;
+    display: none !important;
   }
   .card-body {
     padding: 12px 10px;
@@ -2253,7 +2219,7 @@ img, svg {
     padding: 0;
   }
   .card-slide {
-    padding: 8px 4px;
+    padding: 8px 4px 16px;
   }
   .card-media-vector {
     height: 145px;
@@ -2263,26 +2229,17 @@ img, svg {
     height: 145px;
     max-width: 108px;
   }
-  .quick-view-overlay-btn {
-    font-size: 0.65rem;
-    padding: 3px 8px;
-    bottom: 6px;
-    gap: 4px;
-  }
-  .card-media.has-slider .quick-view-overlay-btn {
-    bottom: 18px;
-  }
   .card-slider-dots {
-    bottom: 4px;
-    gap: 4px;
+    bottom: 5px;
+    gap: 5px;
   }
   .slider-dot {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
   }
   .slider-dot.active {
-    width: 12px;
-    height: 5px;
+    width: 14px;
+    height: 6px;
   }
   .badge-bestseller,
   .product-badge {

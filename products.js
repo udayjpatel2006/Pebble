@@ -585,16 +585,12 @@ function getBookCoverSvg(product) {
   try {
     if (product.customImageUrl && String(product.customImageUrl).trim()) {
       const designLabel = escapeHtml(product.designName || product.title || 'Custom Design');
-      const pagesLabel = product.pages ? `${product.pages}p` : '';
       return `
         <div class="book-cover-custom-img" style="width: 100%; height: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 24px rgba(25, 23, 20, 0.2); position: relative; display: flex; align-items: center; justify-content: center;">
-        <img src="${product.customImageUrl}" alt="${designLabel}" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: contain; display: block;" onerror="this.onerror=null; this.style.display='none';" />
-        <div style="position: absolute; bottom: 8px; left: 8px; right: 8px; background: rgba(255,255,255,0.92); padding: 4px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; text-align: center; color: #232220;">
-          ${designLabel} ${pagesLabel ? '• ' + pagesLabel : ''}
+          <img src="${product.customImageUrl}" alt="${designLabel}" decoding="async" draggable="false" style="width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none;" onerror="this.onerror=null; this.style.display='none';" />
         </div>
-      </div>
-    `;
-  }
+      `;
+    }
 
   const color = product.coverColor || "#C86446";
   const pattern = product.patternType || "botanical";
@@ -753,7 +749,7 @@ function getBookBackCoverHtml(product) {
     const designLabel = escapeHtml(product.designName || product.title || 'Custom Design');
     return `
       <div class="book-cover-custom-img book-back-cover" style="width: 100%; height: 100%; border-radius: 10px; overflow: hidden; box-shadow: 0 12px 24px rgba(25, 23, 20, 0.2); position: relative; display: flex; align-items: center; justify-content: center;">
-        <img src="${escapeHtml(backUrl)}" alt="${designLabel} - Back Page" loading="lazy" decoding="async" style="width: 100%; height: 100%; object-fit: contain; display: block;" onerror="this.onerror=null; this.src='assets/pebble-logo.svg';" />
+        <img src="${backUrl}" alt="${designLabel} - Back Page" decoding="async" draggable="false" style="width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none;" onerror="this.onerror=null; this.src='assets/pebble-logo.svg';" />
       </div>
     `;
   } catch (err) {
