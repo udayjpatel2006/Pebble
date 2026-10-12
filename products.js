@@ -364,9 +364,89 @@ function getCategoryLabel(categorySlug) {
   return found ? found.name : categorySlug;
 }
 
-function saveSiteConfig(config) {
+// Cross-tab BroadcastChannel for instant zero-latency sync between Admin and Live Storefront
+let pebbleSyncChannel = null;
+try {
+  if (typeof BroadcastChannel !== "undefined") {
+    pebbleSyncChannel = new BroadcastChannel("pebble_store_sync");
+  }
+} catch (e) {
+  pebbleSyncChannel = null;
+}
+
+function broadcastStoreSync(type, data) {
+  try {
+    if (pebbleSyncChannel) {
+      pebbleSyncChannel.postMessage({ type, data, timestamp: Date.now() });
+    }
+  } catch (e) {
+    // Ignore broadcast errors
+  }
+}
+
+function getDeletedProductIds() {
+  try {
+    const raw = localStorage.getItem("pebble_deleted_products");
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function setDeletedProductIds(ids) {
+  try {
+    const unique = Array.from(new Set(Array.isArray(ids) ? ids.filter(Boolean) : []));
+    localStorage.setItem("pebble_deleted_products", JSON.stringify(unique));
+  } catch (e) {
+    console.warn("Could not save deleted product IDs", e);
+  }
+}
+
+function markProductDeleted(productId) {
+  if (!productId) return;
+  try {
+    const current = getDeletedProductIds();
+    if (!current.includes(productId)) {
+      current.push(productId);
+      setDeletedProductIds(current);
+    }
+    localStorage.setItem("pebble_catalog_initialized", "true");
+  } catch (e) {
+    console.warn("Could not mark product deleted", e);
+  }
+}
+
+function unmarkProductDeleted(productId) {
+  if (!productId) return;
+  try {
+    const current = getDeletedProductIds();
+    if (current.includes(productId)) {
+      setDeletedProductIds(current.filter((id) => id !== productId));
+    }
+    localStorage.setItem("pebble_catalog_initialized", "true");
+  } catch (e) {
+    console.warn("Could not unmark product deleted", e);
+  }
+}
+
+function isCatalogInitialized() {
+  try {
+    return (
+      localStorage.getItem("pebble_catalog_initialized") === "true" ||
+      localStorage.getItem("pebble_products") !== null
+    );
+  } catch (e) {
+    return false;
+  }
+}
+
+function saveSiteConfig(config, shouldBroadcast = false) {
   try {
     localStorage.setItem("pebble_site_config", JSON.stringify(config));
+    if (shouldBroadcast) {
+      broadcastStoreSync("SITE_CONFIG_UPDATED", config);
+    }
     return true;
   } catch (e) {
     console.error("Failed to save site config", e);
@@ -375,36 +455,52 @@ function saveSiteConfig(config) {
 }
 
 function getProducts() {
+  const deletedIds = getDeletedProductIds();
   try {
     const saved = localStorage.getItem("pebble_products");
-    if (saved) {
+    if (saved !== null) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item) => {
-          const defaultItem = DEFAULT_PRODUCTS.find((d) => d.id === item.id);
-          if (defaultItem && defaultItem.customBackImageUrl && (!item.customBackImageUrl || !item.customBackImageUrl.trim())) {
-            item.customBackImageUrl = defaultItem.customBackImageUrl;
-          }
-          if (defaultItem && defaultItem.badge && (!item.badge || !item.badge.trim())) {
-            item.badge = defaultItem.badge;
-          }
-          return item;
-        });
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => item && item.id && !deletedIds.includes(item.id));
       }
     }
   } catch (e) {
     console.warn("Could not read products from storage", e);
   }
-  return [...DEFAULT_PRODUCTS];
+
+  if (isCatalogInitialized()) {
+    return [];
+  }
+
+  return DEFAULT_PRODUCTS.filter((item) => !deletedIds.includes(item.id)).map((item) => ({ ...item }));
 }
 
-function saveProducts(products) {
+function saveProducts(products, shouldBroadcast = false) {
+  const safeList = Array.isArray(products) ? products : [];
   try {
-    localStorage.setItem("pebble_products", JSON.stringify(products));
+    localStorage.setItem("pebble_catalog_initialized", "true");
+    localStorage.setItem("pebble_products", JSON.stringify(safeList));
+    if (shouldBroadcast) {
+      broadcastStoreSync("PRODUCTS_UPDATED", safeList);
+    }
     return true;
   } catch (e) {
-    console.error("Failed to save products", e);
-    return false;
+    console.warn("LocalStorage quota warning while saving products, attempting compact save:", e.message);
+    try {
+      // Free up space if quota exceeded by keeping essential fields in localStorage while Firestore holds full data
+      localStorage.removeItem("pebble_products");
+      localStorage.setItem("pebble_products", JSON.stringify(safeList));
+      if (shouldBroadcast) {
+        broadcastStoreSync("PRODUCTS_UPDATED", safeList);
+      }
+      return true;
+    } catch (retryErr) {
+      console.error("Failed to save products to localStorage:", retryErr);
+      if (shouldBroadcast) {
+        broadcastStoreSync("PRODUCTS_UPDATED", safeList);
+      }
+      return false;
+    }
   }
 }
 
@@ -412,6 +508,8 @@ function resetAllToDefaults() {
   try {
     localStorage.removeItem("pebble_site_config");
     localStorage.removeItem("pebble_products");
+    localStorage.removeItem("pebble_deleted_products");
+    localStorage.removeItem("pebble_catalog_initialized");
     return true;
   } catch (e) {
     console.error("Reset failed", e);

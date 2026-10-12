@@ -39,31 +39,211 @@ let isFirebaseConfigured = false;
 })();
 
 // ==========================================================================
+// IMAGE COMPRESSION & PORTABLE CLOUD-SAFE ENCODING
+// ==========================================================================
+
+/**
+ * Compress and resize an image File or raw Data URI using HTML5 Canvas
+ * Guarantees output Data URI is < 280KB so Firestore documents (max 1MB)
+ * and localStorage (max 5MB) never fail or throw QuotaExceededError.
+ */
+async function compressImageToSafeDataUri(fileOrDataUri, folder = "covers") {
+  const maxDimMap = {
+    logos: 400,
+    qr: 600,
+    covers: 800,
+    hero: 1000,
+    proofs: 800
+  };
+  const initialMaxDim = maxDimMap[folder] || 800;
+  const maxChars = folder === "logos" ? 150000 : 280000;
+
+  const rawDataUri =
+    typeof fileOrDataUri === "string"
+      ? fileOrDataUri
+      : await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(fileOrDataUri);
+        });
+
+  if (!rawDataUri || !rawDataUri.startsWith("data:image/")) {
+    return rawDataUri;
+  }
+
+  // SVGs are vector XML and already small
+  if (rawDataUri.startsWith("data:image/svg+xml") && rawDataUri.length <= maxChars) {
+    return rawDataUri;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let scale = 1;
+        const origW = img.naturalWidth || img.width || 800;
+        const origH = img.naturalHeight || img.height || 800;
+
+        if (origW > initialMaxDim || origH > initialMaxDim) {
+          scale = initialMaxDim / Math.max(origW, origH);
+        }
+
+        let quality = 0.82;
+        let resultUri = rawDataUri;
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const w = Math.max(1, Math.round(origW * scale));
+          const h = Math.max(1, Math.round(origH * scale));
+
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+
+          // Prefer WebP (supports alpha transparency + superior compression)
+          let candidate = canvas.toDataURL("image/webp", quality);
+          if (!candidate.startsWith("data:image/webp")) {
+            // Fallback for browsers without WebP encoding support
+            if (folder === "logos" && rawDataUri.startsWith("data:image/png") && attempt === 0) {
+              candidate = canvas.toDataURL("image/png");
+            } else {
+              // Fill white background for JPEG fallback
+              const jpgCanvas = document.createElement("canvas");
+              jpgCanvas.width = w;
+              jpgCanvas.height = h;
+              const jpgCtx = jpgCanvas.getContext("2d");
+              jpgCtx.fillStyle = "#FFFFFF";
+              jpgCtx.fillRect(0, 0, w, h);
+              jpgCtx.drawImage(canvas, 0, 0);
+              candidate = jpgCanvas.toDataURL("image/jpeg", quality);
+            }
+          }
+
+          resultUri = candidate;
+          if (resultUri.length <= maxChars) {
+            break;
+          }
+
+          // Step down dimensions and quality if still above cap
+          scale *= 0.78;
+          quality = Math.max(0.55, quality - 0.1);
+        }
+
+        resolve(resultUri);
+      } catch (err) {
+        console.warn("[Pebble Image] Canvas compression fallback:", err);
+        resolve(rawDataUri);
+      }
+    };
+    img.onerror = () => resolve(rawDataUri);
+    img.src = rawDataUri;
+  });
+}
+
+if (typeof window !== "undefined") {
+  window.compressImageToSafeDataUri = compressImageToSafeDataUri;
+}
+
+/**
+ * Helper to sort products consistently (newest custom books first, then default order)
+ */
+function sortCloudProductsList(products) {
+  if (!Array.isArray(products)) return [];
+  return [...products].sort((a, b) => {
+    if (typeof a.sortOrder === "number" && typeof b.sortOrder === "number") {
+      return a.sortOrder - b.sortOrder;
+    }
+    const getCreatedTime = (item) => {
+      if (typeof item.createdAt === "number") return item.createdAt;
+      if (typeof item.createdAt === "string") {
+        const t = Date.parse(item.createdAt);
+        if (!isNaN(t)) return t;
+      }
+      const m = String(item.id || "").match(/^peb-(\d{10,})$/);
+      return m ? Number(m[1]) : 0;
+    };
+    const timeA = getCreatedTime(a);
+    const timeB = getCreatedTime(b);
+    if (timeA !== timeB) {
+      return timeB - timeA; // Newest custom book first
+    }
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  });
+}
+
+// ==========================================================================
 // FIRESTORE DATABASE SERVICE FUNCTIONS
 // ==========================================================================
 
 /**
- * Load all products from Firestore (or fallback & auto-seed if empty)
+ * Load all products from Firestore (respects deletions and empty catalog state)
  */
 async function getCloudProducts() {
   if (isFirebaseConfigured && firestoreDb) {
     try {
+      // Check site_config first for deletedProductIds & catalogInitialized metadata
+      let cloudDeletedIds = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
+      let cloudCatalogInitialized = typeof isCatalogInitialized === "function" ? isCatalogInitialized() : false;
+
+      try {
+        const metaDoc = await firestoreDb.collection("settings").doc("site_config").get();
+        if (metaDoc.exists) {
+          cloudCatalogInitialized = true;
+          const metaData = metaDoc.data() || {};
+          if (Array.isArray(metaData.deletedProductIds)) {
+            cloudDeletedIds = Array.from(new Set([...cloudDeletedIds, ...metaData.deletedProductIds]));
+            if (typeof setDeletedProductIds === "function") {
+              setDeletedProductIds(cloudDeletedIds);
+            }
+          }
+        }
+      } catch (metaErr) {
+        // Ignore meta read error and proceed with products query
+      }
+
       const snapshot = await firestoreDb.collection("products").get();
       if (!snapshot.empty) {
         const cloudProducts = [];
         snapshot.forEach((doc) => {
-          cloudProducts.push({ id: doc.id, ...doc.data() });
+          const data = doc.data() || {};
+          if (!data.isDeleted && !cloudDeletedIds.includes(doc.id)) {
+            cloudProducts.push({ id: doc.id, ...data });
+          }
         });
-        return cloudProducts;
+        try {
+          localStorage.setItem("pebble_catalog_initialized", "true");
+        } catch (e) {}
+        return sortCloudProductsList(cloudProducts);
       } else {
-        // Seed default books to Firestore so the store starts populated
-        console.log("[Pebble Firebase] Initializing Firestore products collection with default books...");
-        const defaults = typeof getProducts === "function" ? getProducts() : [];
-        for (const item of defaults) {
-          const { id, ...data } = item;
-          firestoreDb.collection("products").doc(id).set(data).catch(() => {});
+        // Collection is empty. Only seed default books if the store has NEVER been initialized.
+        if (!cloudCatalogInitialized) {
+          console.log("[Pebble Firebase] First-time setup: seeding default books to Firestore...");
+          const defaults = typeof DEFAULT_PRODUCTS !== "undefined" ? [...DEFAULT_PRODUCTS] : [];
+          for (let i = 0; i < defaults.length; i++) {
+            const { id, ...data } = defaults[i];
+            firestoreDb
+              .collection("products")
+              .doc(id)
+              .set({ ...data, sortOrder: i })
+              .catch(() => {});
+          }
+          firestoreDb
+            .collection("settings")
+            .doc("site_config")
+            .set({ catalogInitialized: true }, { merge: true })
+            .catch(() => {});
+          return defaults;
         }
-        return defaults;
+        // Admin intentionally deleted all books -> return empty array!
+        try {
+          localStorage.setItem("pebble_catalog_initialized", "true");
+        } catch (e) {}
+        return [];
       }
     } catch (err) {
       console.warn("[Pebble Firebase] Firestore read notice (check rules if access denied):", err.message);
@@ -73,32 +253,206 @@ async function getCloudProducts() {
 }
 
 /**
- * Save / Update a product in Firestore
+ * Save / Update a single product in Firestore
  */
 async function saveCloudProduct(product) {
+  if (!product || !product.id) return false;
+
+  if (typeof unmarkProductDeleted === "function") {
+    unmarkProductDeleted(product.id);
+  }
+
   if (isFirebaseConfigured && firestoreDb) {
     try {
-      const { id, ...data } = product;
-      await firestoreDb.collection("products").doc(id).set(data, { merge: true });
-      console.log(`[Pebble Firebase] Product "${product.designName}" saved to Firestore.`);
+      const copy = { ...product };
+      // Ensure any embedded data URIs fit safely within Firestore's 1MB document limit
+      if (copy.customImageUrl && copy.customImageUrl.startsWith("data:image/") && copy.customImageUrl.length > 280000) {
+        copy.customImageUrl = await compressImageToSafeDataUri(copy.customImageUrl, "covers");
+      }
+      if (copy.customBackImageUrl && copy.customBackImageUrl.startsWith("data:image/") && copy.customBackImageUrl.length > 280000) {
+        copy.customBackImageUrl = await compressImageToSafeDataUri(copy.customBackImageUrl, "covers");
+      }
+
+      const { id, ...data } = copy;
+      const payload = {
+        ...data,
+        customImageUrl: data.customImageUrl || "",
+        customBackImageUrl: data.customBackImageUrl || "",
+        backImageUrl: data.customBackImageUrl || "",
+        badge: data.badge || "",
+        isDeleted: false,
+        updatedAt: Date.now(),
+        createdAt: data.createdAt || Date.now()
+      };
+
+      await firestoreDb.collection("products").doc(id).set(payload);
+
+      // Mark catalog initialized and remove from deletedProductIds in site_config
+      const siteUpdate = {
+        catalogInitialized: true,
+        catalogUpdatedAt: Date.now()
+      };
+      if (firebase.firestore && firebase.firestore.FieldValue) {
+        siteUpdate.deletedProductIds = firebase.firestore.FieldValue.arrayRemove(id);
+      }
+      firestoreDb.collection("settings").doc("site_config").set(siteUpdate, { merge: true }).catch(() => {});
+
+      console.log(`[Pebble Firebase] Product "${product.designName}" (${id}) saved to Firestore.`);
+      return true;
     } catch (err) {
-      console.warn("[Pebble Firebase] Error saving product to Firestore:", err.message);
+      console.error("[Pebble Firebase] Error saving product to Firestore:", err);
+      throw err;
     }
   }
+  return true;
 }
 
 /**
- * Delete a product from Firestore
+ * Save / Synchronize an entire array of products to Firestore
+ * (Used when bulk-updating categories, importing backups, or factory resetting)
+ */
+async function saveCloudProducts(productsList, syncDeletions = false) {
+  if (!Array.isArray(productsList)) return false;
+  if (isFirebaseConfigured && firestoreDb) {
+    try {
+      const keepIds = new Set(productsList.map((p) => p && p.id).filter(Boolean));
+
+      if (syncDeletions) {
+        const existingSnap = await firestoreDb.collection("products").get();
+        const deletePromises = [];
+        existingSnap.forEach((doc) => {
+          if (!keepIds.has(doc.id)) {
+            deletePromises.push(firestoreDb.collection("products").doc(doc.id).delete());
+          }
+        });
+        if (deletePromises.length > 0) {
+          await Promise.allSettled(deletePromises);
+        }
+      }
+
+      for (let i = 0; i < productsList.length; i++) {
+        const prod = { ...productsList[i], sortOrder: i };
+        await saveCloudProduct(prod);
+      }
+      return true;
+    } catch (err) {
+      console.warn("[Pebble Firebase] Error batch-saving products to Firestore:", err.message);
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Delete a product permanently from Firestore
  */
 async function deleteCloudProduct(productId) {
+  if (!productId) return false;
+
+  if (typeof markProductDeleted === "function") {
+    markProductDeleted(productId);
+  }
+
   if (isFirebaseConfigured && firestoreDb) {
     try {
       await firestoreDb.collection("products").doc(productId).delete();
+
+      const siteUpdate = {
+        catalogInitialized: true,
+        catalogUpdatedAt: Date.now()
+      };
+      if (firebase.firestore && firebase.firestore.FieldValue) {
+        siteUpdate.deletedProductIds = firebase.firestore.FieldValue.arrayUnion(productId);
+      }
+      await firestoreDb.collection("settings").doc("site_config").set(siteUpdate, { merge: true }).catch(() => {});
+
       console.log(`[Pebble Firebase] Product ${productId} deleted from Firestore.`);
+      return true;
     } catch (err) {
-      console.warn("[Pebble Firebase] Error deleting product from Firestore:", err.message);
+      console.error("[Pebble Firebase] Error deleting product from Firestore:", err);
+      throw err;
     }
   }
+  return true;
+}
+
+/**
+ * Subscribe to real-time Firestore updates for Products and Site Config
+ * Ensures any upload, edit, or delete in Admin reflects live on the Storefront immediately.
+ */
+function subscribeToCloudUpdates({ onProductsChange, onConfigChange } = {}) {
+  if (!isFirebaseConfigured || !firestoreDb) return () => {};
+
+  const unsubscribers = [];
+
+  if (typeof onProductsChange === "function") {
+    try {
+      const unsubProducts = firestoreDb.collection("products").onSnapshot(
+        (snapshot) => {
+          const deletedIds = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
+          const liveProducts = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data() || {};
+            if (!data.isDeleted && !deletedIds.includes(doc.id)) {
+              liveProducts.push({ id: doc.id, ...data });
+            }
+          });
+          const sorted = sortCloudProductsList(liveProducts);
+          onProductsChange(sorted);
+        },
+        (err) => {
+          console.warn("[Pebble Firebase] Live products listener notice:", err.message);
+        }
+      );
+      unsubscribers.push(unsubProducts);
+    } catch (e) {
+      console.warn("[Pebble Firebase] Could not attach products listener:", e.message);
+    }
+  }
+
+  if (typeof onConfigChange === "function") {
+    try {
+      const unsubConfig = firestoreDb
+        .collection("settings")
+        .doc("site_config")
+        .onSnapshot(
+          (doc) => {
+            if (doc.exists) {
+              const data = doc.data() || {};
+              if (Array.isArray(data.deletedProductIds) && typeof setDeletedProductIds === "function") {
+                const currentDel = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
+                setDeletedProductIds(Array.from(new Set([...currentDel, ...data.deletedProductIds])));
+              }
+              const mergedConfig = {
+                ...(typeof DEFAULT_SITE_CONFIG !== "undefined" ? DEFAULT_SITE_CONFIG : {}),
+                ...data
+              };
+              onConfigChange(mergedConfig);
+            }
+          },
+          (err) => {
+            console.warn("[Pebble Firebase] Live site_config listener notice:", err.message);
+          }
+        );
+      unsubscribers.push(unsubConfig);
+    } catch (e) {
+      console.warn("[Pebble Firebase] Could not attach site_config listener:", e.message);
+    }
+  }
+
+  return () => {
+    unsubscribers.forEach((unsub) => {
+      if (typeof unsub === "function") unsub();
+    });
+  };
+}
+
+if (typeof window !== "undefined") {
+  window.saveCloudProduct = saveCloudProduct;
+  window.saveCloudProducts = saveCloudProducts;
+  window.deleteCloudProduct = deleteCloudProduct;
+  window.subscribeToCloudUpdates = subscribeToCloudUpdates;
+  window.sortCloudProductsList = sortCloudProductsList;
 }
 
 /**
@@ -109,7 +463,15 @@ async function getCloudSiteConfig() {
     try {
       const doc = await firestoreDb.collection("settings").doc("site_config").get();
       if (doc.exists) {
-        return { ...DEFAULT_SITE_CONFIG, ...doc.data() };
+        const data = doc.data() || {};
+        if (Array.isArray(data.deletedProductIds) && typeof setDeletedProductIds === "function") {
+          const currentDel = typeof getDeletedProductIds === "function" ? getDeletedProductIds() : [];
+          setDeletedProductIds(Array.from(new Set([...currentDel, ...data.deletedProductIds])));
+        }
+        try {
+          localStorage.setItem("pebble_catalog_initialized", "true");
+        } catch (e) {}
+        return { ...DEFAULT_SITE_CONFIG, ...data };
       } else {
         // Seed initial site config to Firestore
         const initial = typeof getSiteConfig === "function" ? getSiteConfig() : {};
@@ -129,70 +491,50 @@ async function getCloudSiteConfig() {
 async function saveCloudSiteConfig(config) {
   if (isFirebaseConfigured && firestoreDb) {
     try {
-      await firestoreDb.collection("settings").doc("site_config").set(config, { merge: true });
+      const copy = { ...config };
+      if (copy.logoUrl && copy.logoUrl.startsWith("data:image/") && copy.logoUrl.length > 150000) {
+        copy.logoUrl = await compressImageToSafeDataUri(copy.logoUrl, "logos");
+      }
+      if (copy.heroImageUrl && copy.heroImageUrl.startsWith("data:image/") && copy.heroImageUrl.length > 280000) {
+        copy.heroImageUrl = await compressImageToSafeDataUri(copy.heroImageUrl, "hero");
+      }
+      if (copy.merchantQrImageUrl && copy.merchantQrImageUrl.startsWith("data:image/") && copy.merchantQrImageUrl.length > 250000) {
+        copy.merchantQrImageUrl = await compressImageToSafeDataUri(copy.merchantQrImageUrl, "qr");
+      }
+      await firestoreDb.collection("settings").doc("site_config").set(copy, { merge: true });
       console.log("[Pebble Firebase] Site config saved to Firestore.");
+      return true;
     } catch (err) {
       console.warn("[Pebble Firebase] Error saving site config to Firestore:", err.message);
+      return false;
     }
   }
+  return true;
 }
 
 /**
- * Upload an image file (e.g. Logo or Book Cover) to Firebase Storage
- * Returns the public Download URL
+ * Upload & optimize an image file (Logo, Book Cover, QR, Payment Screenshot)
+ * Returns a portable, compressed Data URI that works on both localhost and live Vercel deployments.
  */
 async function uploadImageToStorage(file, folder = "uploads") {
-  // 1. Try local server upload endpoint first (instant, free, reliable, no quota limits)
-  try {
-    const dataUri = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  const optimizedDataUri = await compressImageToSafeDataUri(file, folder);
 
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  // Save a local backup file to /uploads if running on local Node server (non-blocking)
+  try {
+    fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        data: dataUri,
-        filename: file.name,
+        data: optimizedDataUri,
+        filename: file.name || `upload_${Date.now()}.webp`,
         folder: folder
       })
-    });
-
-    if (response.ok) {
-      const json = await response.json();
-      if (json.success && json.url) {
-        console.log("[Pebble Upload] Saved to local storage:", json.url);
-        return json.url;
-      }
-    }
-  } catch (localErr) {
-    console.warn("[Pebble Upload] Local /api/upload notice:", localErr.message);
+    }).catch(() => {});
+  } catch (e) {
+    // Ignore background local backup notice
   }
 
-  // 2. Try Firebase Storage if configured
-  if (isFirebaseConfigured && firebaseStorage) {
-    try {
-      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "")}`;
-      const storageRef = firebaseStorage.ref().child(`${folder}/${fileName}`);
-      const snapshot = await storageRef.put(file);
-      const downloadUrl = await snapshot.ref.getDownloadURL();
-      console.log("[Pebble Firebase] Image uploaded to Storage:", downloadUrl);
-      return downloadUrl;
-    } catch (err) {
-      console.warn("[Pebble Firebase] Storage upload error:", err.message);
-    }
-  }
-
-  // 3. Fallback: return data URI
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+  return optimizedDataUri;
 }
 
 // ==========================================================================

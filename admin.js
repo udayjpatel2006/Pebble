@@ -243,75 +243,34 @@
   // IMAGE OPTIMIZATION & RELIABLE SERVER UPLOAD
   // ==========================================================================
   async function processAndUploadImage(file, folder = 'covers') {
+    if (!file) throw new Error('No file selected');
+
+    // Use shared cloud-safe compressor from firebase-config.js (caps size < 280KB for Firestore & localStorage)
+    if (typeof compressImageToSafeDataUri === 'function') {
+      const optimizedUri = await compressImageToSafeDataUri(file, folder);
+      await uploadToServerOrFallback(optimizedUri, file.name, folder);
+      return optimizedUri;
+    }
+
     return new Promise((resolve, reject) => {
-      // SVGs don't need raster canvas resizing
-      if (file.type === 'image/svg+xml') {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            const url = await uploadToServerOrFallback(e.target.result, file.name, folder);
-            resolve(url);
-          } catch (err) {
-            resolve(e.target.result);
-          }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-        return;
-      }
-
-      // Resize and compress large images using HTML5 Canvas
-      const img = new Image();
       const reader = new FileReader();
-
-      reader.onload = (e) => {
-        img.onload = async () => {
-          try {
-            const maxDim = 1200;
-            let { width, height } = img;
-
-            if (width > maxDim || height > maxDim) {
-              if (width > height) {
-                height = Math.round((height * maxDim) / width);
-                width = maxDim;
-              } else {
-                width = Math.round((width * maxDim) / height);
-                height = maxDim;
-              }
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-
-            const isPng = file.type === 'image/png';
-            const mimeType = isPng ? 'image/png' : 'image/jpeg';
-            const quality = isPng ? undefined : 0.88;
-            const dataUri = canvas.toDataURL(mimeType, quality);
-
-            const url = await uploadToServerOrFallback(dataUri, file.name, folder);
-            resolve(url);
-          } catch (canvasErr) {
-            console.warn('Canvas optimization error, falling back to direct upload:', canvasErr);
-            const fallbackUrl = await uploadToServerOrFallback(e.target.result, file.name, folder);
-            resolve(fallbackUrl);
-          }
-        };
-        img.onerror = () => reject(new Error('Invalid image file format'));
-        img.src = e.target.result;
+      reader.onload = async (e) => {
+        try {
+          const url = await uploadToServerOrFallback(e.target.result, file.name, folder);
+          resolve(url);
+        } catch (err) {
+          resolve(e.target.result);
+        }
       };
-
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }
 
   async function uploadToServerOrFallback(dataUri, originalName, folder) {
-    // 1. Try local server first if available
+    // Save a local file copy to /uploads if running on local server (non-blocking)
     try {
-      const resp = await fetch('/api/upload', {
+      fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -319,39 +278,12 @@
           filename: originalName,
           folder: folder
         })
-      });
-      if (resp.ok) {
-        const json = await resp.json();
-        if (json.success && json.url) {
-          return json.url;
-        }
-      }
+      }).catch(() => {});
     } catch (err) {
-      console.warn('Local upload endpoint notice:', err.message);
+      // Ignore local upload endpoint notice
     }
 
-    // 2. Try Firebase Storage if configured
-    if (typeof firebaseStorage !== 'undefined' && firebaseStorage && typeof isFirebaseConfigured !== 'undefined' && isFirebaseConfigured) {
-      try {
-        const fileName = `${Date.now()}_${originalName.replace(/[^a-zA-Z0-9._-]/g, '')}`;
-        const storageRef = firebaseStorage.ref().child(`${folder}/${fileName}`);
-        const byteString = atob(dataUri.split(',')[1]);
-        const mimeString = dataUri.split(',')[0].split(':')[1].split(';')[0];
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) {
-          ia[i] = byteString.charCodeAt(i);
-        }
-        const blob = new Blob([ab], { type: mimeString });
-        const snapshot = await storageRef.put(blob);
-        const downloadUrl = await snapshot.ref.getDownloadURL();
-        console.log('[Pebble Firebase Storage] Uploaded:', downloadUrl);
-        return downloadUrl;
-      } catch (fbErr) {
-        console.warn('Firebase Storage notice:', fbErr.message);
-      }
-    }
-
+    // Always return the portable optimized dataUri so images work on both localhost and live Vercel site
     return dataUri;
   }
 
@@ -388,88 +320,72 @@
   // ==========================================================================
   // INITIALIZATION
   // ==========================================================================
+  let lastLocalProductMutationTime = 0;
+
   async function init() {
     checkAuthentication();
+    setupEventListeners();
+    updateFirebaseStatusUI();
     await loadData();
     populateFormValues();
     populateProductCategoryDropdowns();
     renderCategoriesTable();
     renderProductsTable();
     await loadOrders();
-    setupEventListeners();
-    updateFirebaseStatusUI();
   }
 
   async function loadData() {
+    const syncStartTime = Date.now();
+
     // 1. Instant local render first (zero latency)
     siteConfig = getSiteConfig();
     productsList = getProducts();
-    if (!Array.isArray(productsList) || productsList.length === 0) {
+    const catalogInit = typeof isCatalogInitialized === 'function' ? isCatalogInitialized() : false;
+    if ((!Array.isArray(productsList) || productsList.length === 0) && !catalogInit) {
       productsList = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS))
         ? [...DEFAULT_PRODUCTS]
         : [];
       saveProducts(productsList);
     }
+    populateFormValues();
+    populateProductCategoryDropdowns();
+    renderCategoriesTable();
+    renderProductsTable();
 
-    // 2. Resilient cloud sync with timeout guard
+    // 2. Resilient cloud sync with generous timeout guard (15s)
     if (typeof getCloudSiteConfig === 'function' && typeof getCloudProducts === 'function') {
       try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Cloud sync timeout')), 2500)
-        );
+        const withTimeout = (promise, ms = 15000) =>
+          Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud sync timeout')), ms))
+          ]);
 
-        const [cloudConfig, cloudProds] = await Promise.race([
-          Promise.all([getCloudSiteConfig(), getCloudProducts()]),
-          timeoutPromise
+        const [configResult, prodsResult] = await Promise.allSettled([
+          withTimeout(getCloudSiteConfig(), 15000),
+          withTimeout(getCloudProducts(), 15000)
         ]);
 
-        let hasChange = false;
-        if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
-          siteConfig = cloudConfig;
-          saveSiteConfig(cloudConfig);
-          populateFormValues();
-          populateProductCategoryDropdowns();
-          renderCategoriesTable();
-          hasChange = true;
+        if (configResult.status === 'fulfilled' && configResult.value && typeof configResult.value === 'object') {
+          const cloudConfig = configResult.value;
+          if (Object.keys(cloudConfig).length > 0) {
+            siteConfig = cloudConfig;
+            saveSiteConfig(cloudConfig);
+            populateFormValues();
+            populateProductCategoryDropdowns();
+            renderCategoriesTable();
+          }
         }
 
-        if (Array.isArray(cloudProds) && cloudProds.length > 0) {
-          const currentLocal = Array.isArray(productsList) ? productsList : [];
-          const defProds = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS)) ? DEFAULT_PRODUCTS : [];
-
-          const merged = cloudProds.map((cp) => {
-            const local = currentLocal.find((p) => p.id === cp.id) || {};
-            const def = defProds.find((d) => d.id === cp.id) || {};
-            return {
-              ...def,
-              ...local,
-              ...cp,
-              badge: (cp.badge && String(cp.badge).trim())
-                || (local.badge && String(local.badge).trim())
-                || (def.badge && String(def.badge).trim())
-                || (cp.isBestseller ? 'BESTSELLER' : '')
-                || '',
-              customBackImageUrl: (cp.customBackImageUrl && cp.customBackImageUrl.trim())
-                || (local.customBackImageUrl && local.customBackImageUrl.trim())
-                || (def.customBackImageUrl && def.customBackImageUrl.trim())
-                || '',
-              customImageUrl: (cp.customImageUrl && cp.customImageUrl.trim())
-                || (local.customImageUrl && local.customImageUrl.trim())
-                || (def.customImageUrl && def.customImageUrl.trim())
-                || ''
-            };
-          });
-
-          currentLocal.forEach((lp) => {
-            if (!merged.some((m) => m.id === lp.id)) {
-              merged.push(lp);
-            }
-          });
-
-          productsList = merged;
+        if (
+          prodsResult.status === 'fulfilled' &&
+          Array.isArray(prodsResult.value) &&
+          lastLocalProductMutationTime < syncStartTime
+        ) {
+          productsList = prodsResult.value;
           saveProducts(productsList);
           renderProductsTable();
-          hasChange = true;
+          renderCategoriesTable();
         }
       } catch (err) {
         console.warn('[Pebble Admin] Cloud sync notice:', err.message);
@@ -893,7 +809,7 @@
 
         // Auto-save immediately so the logo change is never lost
         siteConfig.logoUrl = uploadedUrl;
-        saveSiteConfig(siteConfig);
+        saveSiteConfig(siteConfig, true);
         if (typeof saveCloudSiteConfig === 'function') {
           saveCloudSiteConfig(siteConfig);
         }
@@ -908,7 +824,7 @@
       const val = e.target.value.trim() || 'assets/pebble-logo.svg';
       logoPreviewImg.src = val;
       siteConfig.logoUrl = val;
-      saveSiteConfig(siteConfig);
+      saveSiteConfig(siteConfig, true);
       if (typeof saveCloudSiteConfig === 'function') {
         saveCloudSiteConfig(siteConfig);
       }
@@ -920,7 +836,7 @@
       logoUrlInput.value = def;
       logoPreviewImg.src = def;
       siteConfig.logoUrl = def;
-      saveSiteConfig(siteConfig);
+      saveSiteConfig(siteConfig, true);
       if (typeof saveCloudSiteConfig === 'function') {
         saveCloudSiteConfig(siteConfig);
       }
@@ -940,7 +856,7 @@
           if (heroImgPreview) heroImgPreview.src = uploadedUrl;
 
           siteConfig.heroImageUrl = uploadedUrl;
-          saveSiteConfig(siteConfig);
+          saveSiteConfig(siteConfig, true);
           if (typeof saveCloudSiteConfig === 'function') {
             saveCloudSiteConfig(siteConfig);
           }
@@ -956,7 +872,7 @@
         const val = e.target.value.trim();
         if (heroImgPreview) heroImgPreview.src = val || 'assets/pebble-logo.svg';
         siteConfig.heroImageUrl = val;
-        saveSiteConfig(siteConfig);
+        saveSiteConfig(siteConfig, true);
         if (typeof saveCloudSiteConfig === 'function') {
           saveCloudSiteConfig(siteConfig);
         }
@@ -969,7 +885,7 @@
         if (heroImgPreview) heroImgPreview.src = 'assets/pebble-logo.svg';
         if (heroImageFileInput) heroImageFileInput.value = '';
         siteConfig.heroImageUrl = '';
-        saveSiteConfig(siteConfig);
+        saveSiteConfig(siteConfig, true);
         if (typeof saveCloudSiteConfig === 'function') {
           saveCloudSiteConfig(siteConfig);
         }
@@ -990,7 +906,7 @@
           if (merchantQrPreviewImg) merchantQrPreviewImg.src = uploadedUrl;
 
           siteConfig.merchantQrImageUrl = uploadedUrl;
-          saveSiteConfig(siteConfig);
+          saveSiteConfig(siteConfig, true);
           if (typeof saveCloudSiteConfig === 'function') {
             saveCloudSiteConfig(siteConfig);
           }
@@ -1006,7 +922,7 @@
         const val = e.target.value.trim();
         if (merchantQrPreviewImg) merchantQrPreviewImg.src = val || 'assets/pebble-logo.svg';
         siteConfig.merchantQrImageUrl = val;
-        saveSiteConfig(siteConfig);
+        saveSiteConfig(siteConfig, true);
         if (typeof saveCloudSiteConfig === 'function') {
           saveCloudSiteConfig(siteConfig);
         }
@@ -1019,7 +935,7 @@
         if (merchantQrPreviewImg) merchantQrPreviewImg.src = 'assets/pebble-logo.svg';
         if (merchantQrFileInput) merchantQrFileInput.value = '';
         siteConfig.merchantQrImageUrl = '';
-        saveSiteConfig(siteConfig);
+        saveSiteConfig(siteConfig, true);
         if (typeof saveCloudSiteConfig === 'function') {
           saveCloudSiteConfig(siteConfig);
         }
@@ -1309,7 +1225,7 @@
       })()
     };
 
-    const success = saveSiteConfig(siteConfig);
+    const success = saveSiteConfig(siteConfig, true);
     if (typeof saveCloudSiteConfig === 'function') {
       saveCloudSiteConfig(siteConfig);
     }
@@ -1483,13 +1399,14 @@
     });
 
     if (productsChanged) {
-      saveProducts(productsList);
+      lastLocalProductMutationTime = Date.now();
+      saveProducts(productsList, true);
       if (typeof saveCloudProducts === 'function') {
         try { await saveCloudProducts(productsList); } catch (e) { /* background */ }
       }
     }
 
-    const saved = saveSiteConfig(siteConfig);
+    const saved = saveSiteConfig(siteConfig, true);
     if (typeof saveCloudSiteConfig === 'function') {
       try {
         await saveCloudSiteConfig(siteConfig);
@@ -1546,7 +1463,7 @@
           ? '<span class="badge-stock-in">In Stock</span>'
           : '<span class="badge-stock-out">Out of Stock</span>';
 
-        const badgeText = (p.badge || (p.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
+        const badgeText = (p.badge !== undefined ? p.badge : (p.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
         const badgeClass = badgeText ? 'table-badge-' + badgeText.toLowerCase().replace(/\s+/g, '-') : '';
         const badgePill = badgeText ? `<span class="table-badge-pill ${badgeClass}">${escapeHtml(badgeText)}</span>` : '';
         const hasBackCover = Boolean((p.customBackImageUrl && p.customBackImageUrl.trim()) || (p.backImageUrl && p.backImageUrl.trim()));
@@ -1575,8 +1492,8 @@
             <td>${stockBadge}</td>
             <td>
               <div class="action-btn-row">
-                <button type="button" class="btn-table-edit" onclick="editProduct('${p.id}')">Edit</button>
-                <button type="button" class="btn-table-delete" onclick="deleteProduct('${p.id}')">Delete</button>
+                <button type="button" class="btn-table-edit" onclick="editProduct('${escapeHtml(p.id)}')">Edit</button>
+                <button type="button" class="btn-table-delete" onclick="deleteProduct('${escapeHtml(p.id)}')">Delete</button>
               </div>
             </td>
           </tr>
@@ -1645,10 +1562,11 @@
 
     editDescription.value = product.description || '';
     editInStock.checked = product.inStock !== false;
-    editBestseller.checked = Boolean(product.isBestseller);
+    const resolvedBadge = product.badge !== undefined ? String(product.badge).trim().toUpperCase() : (product.isBestseller ? 'BESTSELLER' : '');
     if (editBadge) {
-      editBadge.value = product.badge ? product.badge.toUpperCase() : (product.isBestseller ? 'BESTSELLER' : '');
+      editBadge.value = resolvedBadge;
     }
+    editBestseller.checked = resolvedBadge === 'BESTSELLER';
 
     productEditModal.classList.add('open');
     productEditModal.setAttribute('aria-hidden', 'false');
@@ -1662,69 +1580,129 @@
   async function handleProductFormSubmit(e) {
     e.preventDefault();
 
-    const id = editProductId.value.trim() || 'peb-' + Date.now();
-    const categoryVal = editCategory.value;
-    const cats = siteConfig.categories || (typeof DEFAULT_SITE_CONFIG !== 'undefined' ? DEFAULT_SITE_CONFIG.categories : []);
-    const foundCat = cats.find((c) => c.id === categoryVal);
-    const categoryLabel = foundCat ? foundCat.name : (categoryVal.charAt(0).toUpperCase() + categoryVal.slice(1));
-
-    const newProduct = {
-      id: id,
-      title: editTitle.value.trim(),
-      designName: editDesignName.value.trim(),
-      category: categoryVal,
-      categoryLabel: categoryLabel,
-      price: Number(editPrice.value),
-      originalPrice: editOriginalPrice.value ? Number(editOriginalPrice.value) : null,
-      pages: Number(editPages.value),
-      paperGsm: editPaperGsm.value.trim() || '120 GSM Ivory',
-      binding: editBinding.value.trim() || 'Sewn Layflat',
-      coverType: editCoverType.value.trim() || 'Hardcover',
-      dimensions: editDimensions.value.trim() || 'A5 (14.8 × 21.0 cm)',
-      ruling: editRuling.value.trim() || 'Dotted Grid',
-      inStock: editInStock.checked,
-      rating: 5.0,
-      reviewsCount: 1,
-      badge: editBadge ? editBadge.value.trim().toUpperCase() : (editBestseller.checked ? 'BESTSELLER' : ''),
-      isBestseller: (editBadge && editBadge.value.trim().toUpperCase() === 'BESTSELLER') || editBestseller.checked,
-      description: editDescription.value.trim() || 'Crafted with premium archival paper.',
-      customImageUrl: editCustomImageUrl.value.trim(),
-      customBackImageUrl: editBackImageUrl ? editBackImageUrl.value.trim() : ''
-    };
-
-    const existingIndex = productsList.findIndex((p) => p.id === id);
-    if (existingIndex > -1) {
-      productsList[existingIndex] = { ...productsList[existingIndex], ...newProduct };
-      showToast(`Book "${newProduct.designName}" updated!`);
-    } else {
-      productsList.unshift(newProduct);
-      showToast(`Added new book "${newProduct.designName}"!`);
+    const submitBtn = productEditForm.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.textContent : 'Save Book Details';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
     }
 
-    saveProducts(productsList);
-    if (typeof saveCloudProduct === 'function') {
-      try {
+    try {
+      lastLocalProductMutationTime = Date.now();
+
+      const id = editProductId.value.trim() || 'peb-' + Date.now();
+      const existingIndex = productsList.findIndex((p) => p.id === id);
+      const existingProd = existingIndex > -1 ? productsList[existingIndex] : null;
+
+      const categoryVal = editCategory.value;
+      const cats = siteConfig.categories || (typeof DEFAULT_SITE_CONFIG !== 'undefined' ? DEFAULT_SITE_CONFIG.categories : []);
+      const foundCat = cats.find((c) => c.id === categoryVal);
+      const categoryLabel = foundCat ? foundCat.name : (categoryVal.charAt(0).toUpperCase() + categoryVal.slice(1));
+
+      const selectedBadge = editBadge ? editBadge.value.trim().toUpperCase() : '';
+      const isBestseller = selectedBadge === 'BESTSELLER';
+      if (editBestseller) editBestseller.checked = isBestseller;
+
+      const frontImg = editCustomImageUrl.value.trim();
+      const backImg = editBackImageUrl ? editBackImageUrl.value.trim() : '';
+
+      const newProduct = {
+        ...(existingProd || {}),
+        id: id,
+        title: editTitle.value.trim(),
+        designName: editDesignName.value.trim(),
+        category: categoryVal,
+        categoryLabel: categoryLabel,
+        price: Number(editPrice.value),
+        originalPrice: editOriginalPrice.value ? Number(editOriginalPrice.value) : null,
+        pages: Number(editPages.value),
+        paperGsm: editPaperGsm.value.trim() || '120 GSM Ivory',
+        binding: editBinding.value.trim() || 'Sewn Layflat',
+        coverType: editCoverType.value.trim() || 'Hardcover',
+        dimensions: editDimensions.value.trim() || 'A5 (14.8 × 21.0 cm)',
+        ruling: editRuling.value.trim() || 'Dotted Grid',
+        inStock: editInStock.checked,
+        rating: existingProd && existingProd.rating ? existingProd.rating : 5.0,
+        reviewsCount: existingProd && existingProd.reviewsCount ? existingProd.reviewsCount : 1,
+        badge: selectedBadge,
+        isBestseller: isBestseller,
+        description: editDescription.value.trim() || 'Crafted with premium archival paper.',
+        coverColor: existingProd && existingProd.coverColor ? existingProd.coverColor : '#C86446',
+        patternType: existingProd && existingProd.patternType ? existingProd.patternType : 'botanical',
+        customImageUrl: frontImg,
+        customBackImageUrl: backImg,
+        backImageUrl: backImg,
+        createdAt: existingProd && existingProd.createdAt ? existingProd.createdAt : Date.now(),
+        updatedAt: Date.now()
+      };
+
+      if (typeof unmarkProductDeleted === 'function') {
+        unmarkProductDeleted(id);
+      }
+
+      if (existingIndex > -1) {
+        productsList[existingIndex] = newProduct;
+      } else {
+        productsList.unshift(newProduct);
+      }
+
+      // 1. Save locally & broadcast immediately to any open storefront tab
+      saveProducts(productsList, true);
+      renderProductsTable();
+      renderCategoriesTable();
+      closeProductModal();
+
+      // 2. Persist to Firestore cloud database
+      if (typeof saveCloudProduct === 'function') {
         await saveCloudProduct(newProduct);
-      } catch (cloudErr) {
-        console.warn('Cloud save warning:', cloudErr);
+        // Re-broadcast after cloud save confirmation
+        saveProducts(productsList, true);
+      }
+
+      showToast(
+        existingIndex > -1
+          ? `✅ Book "${newProduct.designName}" updated on live storefront!`
+          : `✅ Added new book "${newProduct.designName}" to live storefront!`
+      );
+    } catch (cloudErr) {
+      console.error('Error saving product:', cloudErr);
+      showToast('⚠️ Error syncing book to cloud: ' + (cloudErr.message || 'Check connection'));
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
       }
     }
-    renderProductsTable();
-    closeProductModal();
   }
 
-  window.deleteProduct = function (productId) {
+  window.deleteProduct = async function (productId) {
     const product = productsList.find((p) => p.id === productId);
     if (!product) return;
 
     if (confirm(`Are you sure you want to delete "${product.designName}"?`)) {
-      productsList = productsList.filter((p) => p.id !== productId);
-      saveProducts(productsList);
-      if (typeof deleteCloudProduct === 'function') {
-        deleteCloudProduct(productId);
+      lastLocalProductMutationTime = Date.now();
+
+      if (typeof markProductDeleted === 'function') {
+        markProductDeleted(productId);
       }
+
+      productsList = productsList.filter((p) => p.id !== productId);
+      // 1. Save locally & broadcast immediately to live storefront tab
+      saveProducts(productsList, true);
       renderProductsTable();
-      showToast(`Deleted "${product.designName}".`);
+      renderCategoriesTable();
+
+      // 2. Delete from Firestore cloud database
+      if (typeof deleteCloudProduct === 'function') {
+        try {
+          await deleteCloudProduct(productId);
+          saveProducts(productsList, true);
+        } catch (err) {
+          console.warn('Cloud delete warning:', err);
+        }
+      }
+
+      showToast(`🗑️ Deleted "${product.designName}" from live storefront.`);
     }
   };
 
@@ -1755,16 +1733,31 @@
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function (event) {
+    reader.onload = async function (event) {
       try {
         const imported = JSON.parse(event.target.result);
         if (imported.siteConfig && Array.isArray(imported.products)) {
-          saveSiteConfig(imported.siteConfig);
-          saveProducts(imported.products);
-          loadData();
+          lastLocalProductMutationTime = Date.now();
+          siteConfig = imported.siteConfig;
+          productsList = imported.products;
+          if (typeof setDeletedProductIds === 'function') {
+            setDeletedProductIds([]);
+          }
+          saveSiteConfig(siteConfig, true);
+          saveProducts(productsList, true);
           populateFormValues();
+          populateProductCategoryDropdowns();
+          renderCategoriesTable();
           renderProductsTable();
-          showToast('✅ Store backup imported and restored successfully!');
+
+          if (typeof saveCloudSiteConfig === 'function') {
+            await saveCloudSiteConfig({ ...siteConfig, deletedProductIds: [], catalogInitialized: true });
+          }
+          if (typeof saveCloudProducts === 'function') {
+            await saveCloudProducts(productsList, true);
+          }
+
+          showToast('✅ Store backup imported and synced to live storefront!');
         } else {
           alert('Invalid backup file format.');
         }
@@ -1776,17 +1769,31 @@
     e.target.value = '';
   }
 
-  function handleFactoryReset() {
+  async function handleFactoryReset() {
     if (
       confirm(
         'Are you ABSOLUTELY sure you want to restore factory defaults? This will erase all custom changes and restore original texts and sample books.'
       )
     ) {
+      lastLocalProductMutationTime = Date.now();
       resetAllToDefaults();
-      loadData();
+      siteConfig = getSiteConfig();
+      productsList = typeof DEFAULT_PRODUCTS !== 'undefined' ? [...DEFAULT_PRODUCTS] : [];
+      saveSiteConfig(siteConfig, true);
+      saveProducts(productsList, true);
       populateFormValues();
+      populateProductCategoryDropdowns();
+      renderCategoriesTable();
       renderProductsTable();
-      showToast('🔄 Factory defaults restored successfully!');
+
+      if (typeof saveCloudSiteConfig === 'function') {
+        await saveCloudSiteConfig({ ...siteConfig, deletedProductIds: [], catalogInitialized: true });
+      }
+      if (typeof saveCloudProducts === 'function') {
+        await saveCloudProducts(productsList, true);
+      }
+
+      showToast('🔄 Factory defaults restored and synced to live storefront!');
     }
   }
 

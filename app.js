@@ -64,6 +64,64 @@
 
   const toastContainer = document.getElementById('toastContainer');
 
+  let currentQuickViewProductId = null;
+
+  // Synchronize cart items and open Quick View modal when catalog products are edited or deleted
+  function syncCartWithProducts() {
+    if (!Array.isArray(productsList)) return;
+    let cartChanged = false;
+    const updatedCart = [];
+
+    cart.forEach((item) => {
+      const latest = productsList.find((p) => p.id === item.id);
+      if (!latest) {
+        // Product was deleted from catalog
+        cartChanged = true;
+        return;
+      }
+      const latestPrice = Number(latest.price) || 0;
+      const latestBack = latest.customBackImageUrl || latest.backImageUrl || '';
+      if (
+        item.title !== latest.title ||
+        item.designName !== latest.designName ||
+        item.pages !== latest.pages ||
+        item.price !== latestPrice ||
+        item.coverColor !== latest.coverColor ||
+        item.patternType !== latest.patternType ||
+        item.customImageUrl !== latest.customImageUrl ||
+        item.customBackImageUrl !== latestBack
+      ) {
+        cartChanged = true;
+      }
+      updatedCart.push({
+        ...item,
+        title: latest.title,
+        designName: latest.designName,
+        pages: latest.pages,
+        price: latestPrice,
+        coverColor: latest.coverColor,
+        patternType: latest.patternType,
+        customImageUrl: latest.customImageUrl,
+        customBackImageUrl: latestBack
+      });
+    });
+
+    if (cartChanged) {
+      cart = updatedCart;
+      saveCartToStorage();
+    }
+
+    // If Quick View modal is currently open, refresh or close it if product changed/deleted
+    if (currentQuickViewProductId && quickViewModal && quickViewModal.classList.contains('open')) {
+      const stillExists = productsList.some((p) => p.id === currentQuickViewProductId);
+      if (!stillExists) {
+        closeQuickView();
+      } else {
+        openQuickView(currentQuickViewProductId);
+      }
+    }
+  }
+
   // ==========================================
   // INITIALIZATION
   // ==========================================
@@ -77,86 +135,125 @@
     // 3. Load catalog and site configuration
     await loadData();
 
-    // 4. Cross-tab storage synchronization
-    window.addEventListener('storage', async (e) => {
+    // 4. Instant same-browser BroadcastChannel synchronization (Admin <-> Live Storefront)
+    if (typeof pebbleSyncChannel !== 'undefined' && pebbleSyncChannel) {
+      pebbleSyncChannel.addEventListener('message', (event) => {
+        const msg = event.data;
+        if (!msg || !msg.type) return;
+
+        if (msg.type === 'PRODUCTS_UPDATED') {
+          productsList = Array.isArray(msg.products) ? msg.products : getProducts();
+          saveProducts(productsList, false);
+          syncCartWithProducts();
+          renderProducts();
+          updateCartUI();
+        } else if (msg.type === 'SITE_CONFIG_UPDATED') {
+          siteConfig = (msg.siteConfig && typeof msg.siteConfig === 'object') ? msg.siteConfig : getSiteConfig();
+          saveSiteConfig(siteConfig, false);
+          applySiteConfig();
+          renderProducts();
+          updateCartUI();
+        }
+      });
+    }
+
+    // 5. Cross-tab localStorage synchronization (without triggering a stale cloud re-fetch race)
+    window.addEventListener('storage', (e) => {
       if (e.key === 'pebble_cart') {
         loadCartFromStorage();
-      }
-      if (e.key === 'pebble_site_config' || e.key === 'pebble_products') {
-        await loadData();
+      } else if (e.key === 'pebble_products' || e.key === 'pebble_deleted_products' || e.key === 'pebble_deleted_product_ids') {
+        productsList = getProducts();
+        syncCartWithProducts();
+        renderProducts();
+        updateCartUI();
+      } else if (e.key === 'pebble_site_config') {
+        siteConfig = getSiteConfig();
+        applySiteConfig();
+        renderProducts();
+        updateCartUI();
       }
     });
+
+    // 6. Real-time Firebase Cloud listener (syncs changes across devices/tabs automatically)
+    if (typeof subscribeToCloudUpdates === 'function') {
+      subscribeToCloudUpdates({
+        onProductsChange: (cloudProds) => {
+          if (Array.isArray(cloudProds)) {
+            productsList = cloudProds;
+            saveProducts(productsList, false);
+            syncCartWithProducts();
+            renderProducts();
+            updateCartUI();
+          }
+        },
+        onConfigChange: (cloudConfig) => {
+          if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
+            siteConfig = cloudConfig;
+            saveSiteConfig(cloudConfig, false);
+            applySiteConfig();
+            // Also re-filter productsList if deletedProductIds changed in siteConfig
+            if (Array.isArray(cloudConfig.deletedProductIds) && cloudConfig.deletedProductIds.length > 0) {
+              const delSet = new Set(cloudConfig.deletedProductIds);
+              const beforeLen = productsList.length;
+              productsList = productsList.filter((p) => p && !delSet.has(p.id));
+              if (productsList.length !== beforeLen) {
+                saveProducts(productsList, false);
+                syncCartWithProducts();
+              }
+            }
+            renderProducts();
+            updateCartUI();
+          }
+        }
+      });
+    }
   }
 
   async function loadData() {
     // 1. Instant local render (Zero latency - books display immediately!)
     siteConfig = getSiteConfig();
     productsList = getProducts();
-    if (!Array.isArray(productsList) || productsList.length === 0) {
+    const catalogAlreadyInit = (typeof isCatalogInitialized === 'function') && isCatalogInitialized();
+    if (!Array.isArray(productsList) || (productsList.length === 0 && !catalogAlreadyInit)) {
       productsList = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS))
         ? [...DEFAULT_PRODUCTS]
         : [];
-      saveProducts(productsList);
+      saveProducts(productsList, false);
     }
     applySiteConfig();
+    syncCartWithProducts();
     renderProducts();
     updateCartUI();
 
-    // 2. Resilient background cloud sync (guarded by timeout so it never blocks or breaks)
+    // 2. Resilient background cloud sync (15s timeout & independent settlement so neither blocks the other)
     if (typeof getCloudSiteConfig === 'function' && typeof getCloudProducts === 'function') {
       try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Cloud sync timeout')), 2500)
-        );
+        const withTimeout = (promise, ms) =>
+          Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud sync timeout')), ms))
+          ]);
 
-        const [cloudConfig, cloudProds] = await Promise.race([
-          Promise.all([getCloudSiteConfig(), getCloudProducts()]),
-          timeoutPromise
+        const [configResult, prodsResult] = await Promise.allSettled([
+          withTimeout(getCloudSiteConfig(), 15000),
+          withTimeout(getCloudProducts(), 15000)
         ]);
 
         let hasChange = false;
-        if (cloudConfig && typeof cloudConfig === 'object' && Object.keys(cloudConfig).length > 0) {
-          siteConfig = cloudConfig;
-          saveSiteConfig(cloudConfig);
-          applySiteConfig();
-          hasChange = true;
+        if (configResult.status === 'fulfilled' && configResult.value && typeof configResult.value === 'object') {
+          const cloudConfig = configResult.value;
+          if (Object.keys(cloudConfig).length > 0) {
+            siteConfig = cloudConfig;
+            saveSiteConfig(cloudConfig, false);
+            applySiteConfig();
+            hasChange = true;
+          }
         }
 
-        if (Array.isArray(cloudProds) && cloudProds.length > 0) {
-          const currentLocal = Array.isArray(productsList) ? productsList : [];
-          const defProds = (typeof DEFAULT_PRODUCTS !== 'undefined' && Array.isArray(DEFAULT_PRODUCTS)) ? DEFAULT_PRODUCTS : [];
-
-          const merged = cloudProds.map((cp) => {
-            const local = currentLocal.find((p) => p.id === cp.id) || {};
-            const def = defProds.find((d) => d.id === cp.id) || {};
-            return {
-              ...def,
-              ...local,
-              ...cp,
-              badge: (cp.badge && String(cp.badge).trim())
-                || (local.badge && String(local.badge).trim())
-                || (def.badge && String(def.badge).trim())
-                || (cp.isBestseller ? 'BESTSELLER' : '')
-                || '',
-              customBackImageUrl: (cp.customBackImageUrl && cp.customBackImageUrl.trim())
-                || (local.customBackImageUrl && local.customBackImageUrl.trim())
-                || (def.customBackImageUrl && def.customBackImageUrl.trim())
-                || '',
-              customImageUrl: (cp.customImageUrl && cp.customImageUrl.trim())
-                || (local.customImageUrl && local.customImageUrl.trim())
-                || (def.customImageUrl && def.customImageUrl.trim())
-                || ''
-            };
-          });
-
-          currentLocal.forEach((lp) => {
-            if (!merged.some((m) => m.id === lp.id)) {
-              merged.push(lp);
-            }
-          });
-
-          productsList = merged;
-          saveProducts(productsList);
+        if (prodsResult.status === 'fulfilled' && Array.isArray(prodsResult.value)) {
+          productsList = prodsResult.value;
+          saveProducts(productsList, false);
+          syncCartWithProducts();
           renderProducts();
           hasChange = true;
         }
@@ -819,7 +916,7 @@
             const dimText = product.dimensions ? String(product.dimensions).split(' ')[0] : 'Standard';
             const gsmText = product.paperGsm ? String(product.paperGsm).split(' ')[0] : '100';
 
-            const badgeText = (product.badge || (product.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
+            const badgeText = (product.badge !== undefined ? String(product.badge) : (product.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
             let badgeClass = 'badge-bestseller';
             if (badgeText === 'NEW') badgeClass = 'badge-new';
             else if (badgeText === 'LIMITED') badgeClass = 'badge-limited';
@@ -1008,6 +1105,7 @@
     const product = productsList.find((p) => p.id === productId);
     if (!product) return;
 
+    currentQuickViewProductId = product.id;
     quickViewQuantity = 1;
 
     const coverSvgHtml = getBookCoverSvg(product);
@@ -1016,7 +1114,7 @@
       : '';
     const hasBack = Boolean(backCoverHtml);
 
-    const badgeText = (product.badge || (product.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
+    const badgeText = (product.badge !== undefined ? String(product.badge) : (product.isBestseller ? 'BESTSELLER' : '')).trim().toUpperCase();
     let badgeClass = 'badge-bestseller';
     if (badgeText === 'NEW') badgeClass = 'badge-new';
     else if (badgeText === 'LIMITED') badgeClass = 'badge-limited';
@@ -1149,10 +1247,13 @@
     quickViewQuantity = Math.max(1, quickViewQuantity + delta);
     qtyElem.textContent = quickViewQuantity;
 
-    const modalTitle = document.querySelector('.modal-product-title').textContent;
-    const product = productsList.find((p) => p.title === modalTitle);
+    const product = (currentQuickViewProductId && productsList.find((p) => p.id === currentQuickViewProductId))
+      || productsList.find((p) => {
+        const titleEl = document.querySelector('.modal-product-title');
+        return titleEl && p.title === titleEl.textContent;
+      });
     if (product && btnTotal) {
-      btnTotal.textContent = product.price * quickViewQuantity;
+      btnTotal.textContent = (Number(product.price) || 0) * quickViewQuantity;
     }
   };
 
@@ -1167,6 +1268,7 @@
     quickViewModal.classList.remove('open');
     quickViewModal.setAttribute('aria-hidden', 'true');
     quickViewQuantity = 1;
+    currentQuickViewProductId = null;
   }
 
   // ==========================================
